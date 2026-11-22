@@ -9,6 +9,7 @@ Commands:
   python uploader.py auth                 # ek baar: Google login (YouTube + Drive same account) -> token.json
   python uploader.py auth youtube         # alag accounts hon toh: YouTube channel wala login -> token.json
   python uploader.py auth drive           #                        Drive folder wala login   -> token_drive.json
+  python uploader.py auth youtube2        # doosra YouTube channel (optional)                -> token_2.json
   python uploader.py status               # kitne upload hue / baaki hain
   python uploader.py upload --count 3     # agle 3 pending videos upload
   python uploader.py upload --dry-run     # sirf dikhao kya upload hoga
@@ -115,11 +116,22 @@ def _load(env_name, filename):
     return None
 
 
+CHANNEL_TOKENS = {"youtube": ("GOOGLE_TOKEN", "token.json"), "youtube2": ("GOOGLE_TOKEN_2", "token_2.json")}
+
+
+def has_token(kind):
+    env, fname = CHANNEL_TOKENS[kind]
+    return bool(os.environ.get(env, "").strip()) or (ROOT / fname).exists()
+
+
 def credentials(kind="youtube"):
-    """kind='youtube' -> GOOGLE_TOKEN / token.json
-       kind='drive'   -> GOOGLE_DRIVE_TOKEN / token_drive.json (na ho toh YouTube wala token)"""
-    creds = _load("GOOGLE_DRIVE_TOKEN", "token_drive.json") if kind == "drive" else None
-    creds = creds or _load("GOOGLE_TOKEN", "token.json")
+    """kind='youtube'  -> GOOGLE_TOKEN / token.json        (channel 1)
+       kind='youtube2' -> GOOGLE_TOKEN_2 / token_2.json    (channel 2, optional)
+       kind='drive'    -> GOOGLE_DRIVE_TOKEN / token_drive.json (na ho toh channel 1 wala token)"""
+    if kind == "drive":
+        creds = _load("GOOGLE_DRIVE_TOKEN", "token_drive.json") or _load(*CHANNEL_TOKENS["youtube"])
+    else:
+        creds = _load(*CHANNEL_TOKENS[kind])
     if not creds:
         die("Token nahi mila. Pehle apne computer pe chalao: python uploader.py auth")
     if not creds.valid:
@@ -135,6 +147,7 @@ def cmd_auth(args):
         "both": (SCOPES, "token.json", "GOOGLE_TOKEN"),
         "youtube": ([YT_SCOPE], "token.json", "GOOGLE_TOKEN"),
         "drive": ([DRIVE_SCOPE], "token_drive.json", "GOOGLE_DRIVE_TOKEN"),
+        "youtube2": ([YT_SCOPE], "token_2.json", "GOOGLE_TOKEN_2"),
     }[args.which]
     print(f"🔐 Login: {args.which}  →  browser mein sahi account chuno")
     flow = InstalledAppFlow.from_client_config(client_config(), scopes)
@@ -302,6 +315,10 @@ class YouTube:
     def __init__(self, creds):
         self.api = build("youtube", "v3", credentials=creds, cache_discovery=False)
         self.playlist_id = None
+        ch = self.api.channels().list(part="snippet", mine=True).execute().get("items", [])
+        if not ch:
+            die("Is login pe YouTube channel nahi mila")
+        self.channel_id, self.channel_name = ch[0]["id"], ch[0]["snippet"]["title"]
 
     def playlist(self):
         if not PLAYLIST_TITLE:
@@ -388,13 +405,29 @@ def is_quota_error(e):
 
 
 # ─────────────── commands ───────────────
+def load_channels(lib):
+    """Har channel ke liye: YouTube client, done IDs, baaki ginti."""
+    out = []
+    for n, kind in (("1", "youtube"), ("2", "youtube2")):
+        if not has_token(kind):
+            continue
+        yt = YouTube(credentials(kind))
+        if any(c["yt"].channel_id == yt.channel_id for c in out):
+            die("Dono tokens ek hi channel ke hain — doosra login doosre channel se karo: python uploader.py auth youtube2")
+        done = lib.done_ids(yt.channel_videos())
+        out.append({"n": n, "yt": yt, "done": done, "left": sum(1 for i in lib.meta if i not in done),
+                    "pending": lib.pending(done)})
+    return out
+
+
 def cmd_status(_args):
     lib = Library(Drive(credentials("drive")))
-    done = lib.done_ids(YouTube(credentials("youtube")).channel_videos())
     no_video = sorted(set(lib.meta) - set(lib.videos))
     no_meta = lib.unmatched_files
     print(f"📄 CSV rows: {len(lib.meta)}   🎬 Videos: {len(lib.videos)}")
-    print(f"✅ YouTube pe pehle se: {len(done)}   ⏳ Pending: {len(lib.pending(done))}")
+    for c in load_channels(lib):
+        nxt = c["pending"][0] if c["pending"] else "-"
+        print(f"📺 Channel {c['n']} ({c['yt'].channel_name}): ✅ {len(c['done'])} uploaded  ⏳ {c['left']} baaki  → agla {nxt}")
     if no_video:
         print(f"⚠️  CSV mein hai, video nahi: {', '.join(no_video[:20])}{' ...' if len(no_video) > 20 else ''}")
     if no_meta:
@@ -411,16 +444,23 @@ def set_output(name, value):
 
 def cmd_upload(args):
     lib = Library(Drive(credentials("drive")))
-    yt = YouTube(credentials("youtube"))
-    done = lib.done_ids(yt.channel_videos())
-    left = sum(1 for i in lib.meta if i not in done)      # CSV ke kitne videos abhi YouTube pe nahi
-    pending = lib.pending(done)
-    todo = pending[: args.count]
-    print(f"⏳ Baaki: {left}  →  is run mein: {len(todo)}  (privacy: {VIDEO_PRIVACY}, kids: {MADE_FOR_KIDS})")
-    if not todo:
-        set_output("remaining", left)
-        print("🎉 Saare videos upload ho gaye" if left == 0 else "⏸️  Abhi upload karne layak video nahi — agle run mein")
+    channels = load_channels(lib)
+    if not channels:
+        die("Koi YouTube token nahi mila. Chalao: python uploader.py auth youtube")
+    for c in channels:
+        print(f"📺 Channel {c['n']} ({c['yt'].channel_name}): {len(c['done'])} uploaded, {c['left']} baaki")
+    total_left = sum(c["left"] for c in channels)
+    # jo channel sabse peeche hai (kam upload) usi pe is run ka video — quota dono mein barabar bante
+    ready = [c for c in channels if c["pending"]]
+    if not ready:
+        set_output("remaining", total_left)
+        print("🎉 Saare videos upload ho gaye" if total_left == 0 else "⏸️  Abhi upload karne layak video nahi — agle run mein")
         return
+    ch = min(ready, key=lambda c: (len(c["done"]), c["n"]))
+    yt, left = ch["yt"], ch["left"]
+    todo = ch["pending"][: args.count]
+    print(f"➡️  Is run mein: Channel {ch['n']} ({yt.channel_name}) → {len(todo)} video  "
+          f"(privacy: {VIDEO_PRIVACY}, kids: {MADE_FOR_KIDS})")
     if args.dry_run:
         for i in todo:
             print(f"   {i}  {lib.videos[i]['name']}  →  {lib.title_of(i)}")
@@ -451,9 +491,10 @@ def cmd_upload(args):
             print(f"   ⚠️  Playlist mein add nahi hua: {e}")
         print(f"   ✅ Uploaded: https://youtu.be/{video_id}")
         left -= 1
+        total_left -= 1
         time.sleep(3)
-    set_output("remaining", left)
-    print(f"\n📊 Ab baaki: {left}")
+    set_output("remaining", total_left)
+    print(f"\n📊 Ab baaki (sab channels): {total_left}")
     if failed:
         sys.exit(f"❌ {failed} video fail hue")
 
@@ -462,7 +503,7 @@ def main():
     ap = argparse.ArgumentParser(description="Drive -> YouTube Shorts uploader")
     sub = ap.add_subparsers(dest="cmd", required=True)
     au = sub.add_parser("auth", help="Google login (local, ek baar)")
-    au.add_argument("which", nargs="?", choices=["both", "youtube", "drive"], default="both")
+    au.add_argument("which", nargs="?", choices=["both", "youtube", "drive", "youtube2"], default="both")
     au.set_defaults(fn=cmd_auth)
     sub.add_parser("status", help="kitne baaki hain").set_defaults(fn=cmd_status)
     up = sub.add_parser("upload", help="pending videos upload karo")

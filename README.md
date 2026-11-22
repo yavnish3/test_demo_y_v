@@ -29,6 +29,12 @@ Browser khulega → woh Google account chuno jisme Drive folder **aur** YouTube 
 .venv/bin/python uploader.py auth drive     # Drive folder wala account -> token_drive.json
 ```
 
+**Doosra YouTube channel bhi (optional):** same videos doosre channel pe bhi jayenge.
+```bash
+.venv/bin/python uploader.py auth youtube2  # doosre channel ko chuno -> token_2.json
+```
+Har run mein 1 video us channel pe jata hai jo peeche hai, taaki dono barabar chalein aur shared quota (~6 upload/din) mein fit rahein. Dono channel CSV order mein apne-apne hisaab se aage badhte hain.
+
 ### 3. Local test
 ```bash
 export DRIVE_FOLDER_ID=<drive folder link ka last part>
@@ -42,6 +48,7 @@ Kuch IDs zabardasti skip karni hon toh GitHub Variable `SKIP_IDS` mein daalo, ja
 gh secret set GOOGLE_CLIENT_SECRET < client_secret.json
 gh secret set GOOGLE_TOKEN < token.json
 gh secret set GOOGLE_DRIVE_TOKEN < token_drive.json   # sirf agar alag Drive login kiya
+gh secret set GOOGLE_TOKEN_2 < token_2.json           # sirf agar doosra channel bhi
 gh secret set DRIVE_FOLDER_ID --body "<folder id>"
 ```
 Optional variables (Settings → Secrets and variables → Actions → Variables):
@@ -49,13 +56,12 @@ Optional variables (Settings → Secrets and variables → Actions → Variables
 |---|---|---|
 | `VIDEO_PRIVACY` | `public` | `private` / `unlisted` / `public` |
 | `PLAYLIST_TITLE` | `AI Shorts` | khaali = playlist nahi |
-| `PER_RUN_COUNT` | `1` | har run mein kitne videos (har 6 ghante ek run) |
 | `SKIP_IDS` | | ye IDs kabhi upload nahi hongi |
 | `MADE_FOR_KIDS` | `false` | bachchon ke liye bana content hai toh `true` (YouTube/COPPA rule) |
 
 ### 5. Chalao (sirf ek baar)
 *Actions → YouTube Upload Loop → Run workflow*
-- `interval_minutes`: har video ke beech ka gap (default `350` ≈ 6 ghante, max 350; test ke liye `5`)
+- `interval_minutes`: har video ke beech ka gap (default `240` = 4 ghante → roz 6 upload; max 350; test ke liye `5`)
 - `count`: har run mein kitne videos (default `1`)
 
 Har run 1 video upload karta hai, phir intezaar karke khud ko dobara start karta hai. Saare videos upload hone pe loop apne aap ruk jata hai.
@@ -66,6 +72,7 @@ Har run 1 video upload karta hai, phir intezaar karke khud ko dobara start karta
 
 ## Dhyan rakhne wali baatein
 - **Private lock:** Jab tak Google aapke API project ka audit nahi karta, API se upload hue videos YouTube **private** pe lock kar deta hai, `VIDEO_PRIVACY=public` set karne pe bhi. Inhe Studio se haath se public karo, ya [audit form](https://support.google.com/youtube/contact/yt_api_form) bharo.
-- **Quota:** Roz 10,000 units milte hain, aur ek upload ~1,600 ka padta hai. Isliye ek din mein max ~6 uploads ho sakte hain.
+- **Quota:** Roz 10,000 units milte hain, aur ek upload ~1,600 ka padta hai. Isliye ek din mein max ~6 uploads ho sakte hain (dono channels mila ke, kyunki Cloud project ek hai).
+- **Do channel, same video:** YouTube ise "repetitive/reused content" maan sakta hai, jisse reach ya monetization pe asar pad sakta hai.
 - Sirf apne ya permission wale videos upload karo.
 - `client_secret.json`, `token.json` aur CSV `.gitignore` mein hain. Inhe kabhi commit mat karna.
