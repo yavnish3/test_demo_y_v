@@ -442,57 +442,61 @@ def set_output(name, value):
             fh.write(f"{name}={value}\n")
 
 
+def upload_one(lib, yt, i):
+    """Ek video Drive se download karke ek channel pe upload. Return: 'ok' / 'fail' / 'quota'."""
+    row, vfile = lib.meta[i], lib.videos[i]
+    title = lib.title_of(i)
+    desc = clean_desc(row.get(DESC_COLUMN), title)
+    print(f"\n🎬 {i} → {yt.channel_name}  ({vfile['name']})")
+    with tempfile.TemporaryDirectory() as tmp:
+        local = Path(tmp) / f"video{Path(vfile['name']).suffix or '.mp4'}"
+        try:
+            print("   ⬇️  Drive se download...")
+            lib.drive.download(vfile["id"], local)
+            video_id = yt.upload(local, title, desc, i)
+        except Exception as e:  # noqa: BLE001
+            if is_quota_error(e):
+                print("   ⛔ YouTube quota/limit khatam — agle run mein phir try hoga")
+                return "quota"
+            print(f"   ❌ Fail: {e}")
+            return "fail"
+    try:
+        yt.add_to_playlist(video_id)
+    except HttpError as e:
+        print(f"   ⚠️  Playlist mein add nahi hua: {e}")
+    print(f"   ✅ Uploaded: https://youtu.be/{video_id}")
+    return "ok"
+
+
 def cmd_upload(args):
+    """Har run mein HAR channel pe `count` video (CSV order mein, har channel apni progress se)."""
     lib = Library(Drive(credentials("drive")))
     channels = load_channels(lib)
     if not channels:
         die("Koi YouTube token nahi mila. Chalao: python uploader.py auth youtube")
+    print(f"privacy: {VIDEO_PRIVACY}, kids: {MADE_FOR_KIDS}")
+    total_left, failed = 0, 0
     for c in channels:
-        print(f"📺 Channel {c['n']} ({c['yt'].channel_name}): {len(c['done'])} uploaded, {c['left']} baaki")
-    total_left = sum(c["left"] for c in channels)
-    # jo channel sabse peeche hai (kam upload) usi pe is run ka video — quota dono mein barabar bante
-    ready = [c for c in channels if c["pending"]]
-    if not ready:
-        set_output("remaining", total_left)
-        print("🎉 Saare videos upload ho gaye" if total_left == 0 else "⏸️  Abhi upload karne layak video nahi — agle run mein")
-        return
-    ch = min(ready, key=lambda c: (len(c["done"]), c["n"]))
-    yt, left = ch["yt"], ch["left"]
-    todo = ch["pending"][: args.count]
-    print(f"➡️  Is run mein: Channel {ch['n']} ({yt.channel_name}) → {len(todo)} video  "
-          f"(privacy: {VIDEO_PRIVACY}, kids: {MADE_FOR_KIDS})")
-    if args.dry_run:
+        yt, left = c["yt"], c["left"]
+        todo = c["pending"][: args.count]
+        print(f"\n📺 Channel {c['n']} ({yt.channel_name}): {len(c['done'])} uploaded, {left} baaki  →  is run mein {len(todo)}")
+        if not todo:
+            print("   🎉 Is channel pe sab ho gaya" if left == 0 else "   ⏸️  Abhi upload karne layak video nahi")
         for i in todo:
-            print(f"   {i}  {lib.videos[i]['name']}  →  {lib.title_of(i)}")
-        return
-
-    failed = 0
-    for i in todo:
-        row, vfile = lib.meta[i], lib.videos[i]
-        title = lib.title_of(i)
-        desc = clean_desc(row.get(DESC_COLUMN), title)
-        print(f"\n🎬 {i}  ({vfile['name']})")
-        with tempfile.TemporaryDirectory() as tmp:
-            local = Path(tmp) / f"video{Path(vfile['name']).suffix or '.mp4'}"
-            try:
-                print("   ⬇️  Drive se download...")
-                lib.drive.download(vfile["id"], local)
-                video_id = yt.upload(local, title, desc, i)
-            except Exception as e:  # noqa: BLE001
-                if is_quota_error(e):
-                    print("⛔ YouTube quota/limit khatam — kal phir try hoga")
-                    break
-                failed += 1
-                print(f"   ❌ Fail: {e}")
+            if args.dry_run:
+                print(f"   {i}  {lib.videos[i]['name']}  →  {lib.title_of(i)}")
                 continue
-        try:
-            yt.add_to_playlist(video_id)
-        except HttpError as e:
-            print(f"   ⚠️  Playlist mein add nahi hua: {e}")
-        print(f"   ✅ Uploaded: https://youtu.be/{video_id}")
-        left -= 1
-        total_left -= 1
-        time.sleep(3)
+            res = upload_one(lib, yt, i)
+            if res == "ok":
+                left -= 1
+                time.sleep(3)
+            elif res == "fail":
+                failed += 1
+            else:          # quota: is channel pe aage try karna bekaar
+                break
+        total_left += left
+    if args.dry_run:
+        return
     set_output("remaining", total_left)
     print(f"\n📊 Ab baaki (sab channels): {total_left}")
     if failed:

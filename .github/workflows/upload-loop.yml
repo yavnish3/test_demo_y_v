@@ -6,10 +6,10 @@ on:
   workflow_dispatch:
     inputs:
       interval_minutes:
-        description: "Har video ke beech kitne minute (240 = roz 6 upload; max 350)"
-        default: "240"
+        description: "Har run ke beech kitne minute (max 350 ≈ 6 ghante)"
+        default: "350"
       count:
-        description: "Har run mein kitne videos"
+        description: "Har run mein har channel pe kitne videos"
         default: "1"
 
 concurrency:
@@ -65,7 +65,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 355
     env:
-      INTERVAL: ${{ inputs.interval_minutes || '240' }}
+      INTERVAL: ${{ inputs.interval_minutes || '350' }}
       COUNT: ${{ inputs.count || '1' }}
       REMAINING: ${{ needs.upload.outputs.remaining }}
     steps:

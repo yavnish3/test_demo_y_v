@@ -33,7 +33,7 @@ Browser khulega → woh Google account chuno jisme Drive folder **aur** YouTube 
 ```bash
 .venv/bin/python uploader.py auth youtube2  # doosre channel ko chuno -> token_2.json
 ```
-Har run mein 1 video us channel pe jata hai jo peeche hai, taaki dono barabar chalein aur shared quota (~6 upload/din) mein fit rahein. Dono channel CSV order mein apne-apne hisaab se aage badhte hain.
+Har run mein **har channel pe 1 video** jata hai. Dono channel CSV order mein apne-apne hisaab se aage badhte hain.
 
 ### 3. Local test
 ```bash
@@ -61,8 +61,8 @@ Optional variables (Settings → Secrets and variables → Actions → Variables
 
 ### 5. Chalao (sirf ek baar)
 *Actions → YouTube Upload Loop → Run workflow*
-- `interval_minutes`: har video ke beech ka gap (default `240` = 4 ghante → roz 6 upload; max 350; test ke liye `5`)
-- `count`: har run mein kitne videos (default `1`)
+- `interval_minutes`: har run ke beech ka gap (default `350` ≈ 6 ghante, max 350; test ke liye `5`)
+- `count`: har run mein har channel pe kitne videos (default `1`)
 
 Har run 1 video upload karta hai, phir intezaar karke khud ko dobara start karta hai. Saare videos upload hone pe loop apne aap ruk jata hai.
 - **Loop rokna ho:** repo mein `STOP` naam ki file bana do (GitHub website pe *Add file → Create new file*). Agla run kuch upload nahi karega aur loop khatam. Ya Actions mein chal raha run kholo → *Cancel workflow*.
@@ -72,7 +72,7 @@ Har run 1 video upload karta hai, phir intezaar karke khud ko dobara start karta
 
 ## Dhyan rakhne wali baatein
 - **Private lock:** Jab tak Google aapke API project ka audit nahi karta, API se upload hue videos YouTube **private** pe lock kar deta hai, `VIDEO_PRIVACY=public` set karne pe bhi. Inhe Studio se haath se public karo, ya [audit form](https://support.google.com/youtube/contact/yt_api_form) bharo.
-- **Quota:** Roz 10,000 units milte hain, aur ek upload ~1,600 ka padta hai. Isliye ek din mein max ~6 uploads ho sakte hain (dono channels mila ke, kyunki Cloud project ek hai).
+- **Quota:** Roz 10,000 units milte hain, aur ek upload ~1,600 ka padta hai. Isliye ek din mein max ~6 uploads ho sakte hain (dono channels mila ke, kyunki Cloud project ek hai). Quota khatam ho toh script bina error ruk jaati hai aur agla run phir try karta hai.
 - **Do channel, same video:** YouTube ise "repetitive/reused content" maan sakta hai, jisse reach ya monetization pe asar pad sakta hai.
 - Sirf apne ya permission wale videos upload karo.
 - `client_secret.json`, `token.json` aur CSV `.gitignore` mein hain. Inhe kabhi commit mat karna.
