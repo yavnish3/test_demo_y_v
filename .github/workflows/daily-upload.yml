@@ -37,5 +37,6 @@ jobs:
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
           VIDEO_PRIVACY: ${{ vars.VIDEO_PRIVACY || 'private' }}
           PLAYLIST_TITLE: ${{ vars.PLAYLIST_TITLE || 'AI Shorts' }}
+          MADE_FOR_KIDS: ${{ vars.MADE_FOR_KIDS || 'false' }}
           COUNT: ${{ inputs.count || vars.DAILY_COUNT || '3' }}
         run: python uploader.py upload --count "$COUNT"

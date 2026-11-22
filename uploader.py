@@ -2,15 +2,15 @@
 Google Drive folder -> YouTube Shorts auto uploader.
 
 Drive folder mein:
-  - videos (kisi bhi subfolder mein), naam ID se shuru: 0001_edited.mp4, 12_final.mp4 ...
-  - ek CSV jisme ID column + Title + Description
+  - videos (kisi bhi subfolder mein)
+  - ek CSV (default: all_shorts_data.csv) jisme Unique ID, File Name, Title, Description
 
 Commands:
   python uploader.py auth                 # ek baar, apne computer pe: Google login -> token.json
   python uploader.py status               # kitne upload hue / baaki hain
   python uploader.py upload --count 3     # agle 3 pending videos upload
   python uploader.py upload --dry-run     # sirf dikhao kya upload hoga
-  python uploader.py mark-done 1-66       # in IDs ko "pehle se uploaded" maan lo (dobara upload nahi honge)
+  python uploader.py mark-done VID0001-VID0066   # in IDs ko "pehle se uploaded" maan lo (dobara upload nahi honge)
 
 Settings environment variables se aati hain (GitHub Secrets / Variables), ya local files se.
 """
@@ -47,10 +47,13 @@ DRIVE_FOLDER_ID = os.environ.get("DRIVE_FOLDER_ID", "").strip()
 VIDEO_PRIVACY = os.environ.get("VIDEO_PRIVACY", "private").strip() or "private"   # private / unlisted / public
 PLAYLIST_TITLE = os.environ.get("PLAYLIST_TITLE", "AI Shorts").strip()               # khaali = playlist nahi
 CATEGORY_ID = os.environ.get("CATEGORY_ID", "22").strip() or "22"                     # 22 People & Blogs, 23 Comedy
-ID_COLUMN = os.environ.get("ID_COLUMN", "Serial Number")
+MADE_FOR_KIDS = os.environ.get("MADE_FOR_KIDS", "false").strip().lower() == "true"
+ID_COLUMN = os.environ.get("ID_COLUMN", "Unique ID")
+FILE_COLUMN = os.environ.get("FILE_COLUMN", "File Name")
 TITLE_COLUMN = os.environ.get("TITLE_COLUMN", "Title")
 DESC_COLUMN = os.environ.get("DESC_COLUMN", "Description")
-CSV_NAME = os.environ.get("CSV_NAME", "").strip()      # agar folder mein ek se zyada CSV hon
+CSV_NAME = os.environ.get("CSV_NAME", "").strip()      # khaali = all_shorts_data.csv ya akeli CSV
+DEFAULT_CSV = "all_shorts_data.csv"
 LOG_NAME = "youtube_upload_log.csv"                     # Drive folder mein ye script khud banati hai
 VIDEO_EXT = {".mp4", ".mov", ".m4v", ".webm", ".mkv"}
 LOG_FIELDS = ["id", "status", "video_id", "file", "title", "uploaded_at", "playlist"]
@@ -65,11 +68,30 @@ def die(msg):
 
 
 def norm_id(value):
-    """'1', '0001', '1.0' -> '0001'"""
+    """'1', '0001', '1.0' -> '0001';  'vid0001 ' -> 'VID0001'"""
     s = str(value).strip()
     if re.fullmatch(r"\d+(\.0+)?", s):
         return str(int(float(s))).zfill(4)
-    return s
+    return s.upper()
+
+
+def natural_key(x):
+    return [int(p) if p.isdigit() else p for p in re.split(r"(\d+)", x)]
+
+
+def expand_ids(spec):
+    """'VID0001-VID0066,VID0070' ya '1-66' -> list of IDs"""
+    out = []
+    for part in spec.split(","):
+        part = part.strip()
+        m = re.fullmatch(r"([A-Za-z_]*)(\d+)\s*-\s*([A-Za-z_]*)(\d+)", part)
+        if m:
+            prefix, a, _, b = m.groups()
+            width = len(a) if prefix else 4
+            out += [norm_id(f"{prefix}{str(i).zfill(width)}") for i in range(int(a), int(b) + 1)]
+        elif part:
+            out.append(norm_id(part))
+    return out
 
 
 # ─────────────── auth ───────────────
@@ -188,6 +210,8 @@ class Library:
                 (f["name"].lower().endswith(".csv") or f["mimeType"] in ("text/csv", SHEET_MIME))]
         if CSV_NAME:
             csvs = [f for f in csvs if f["name"] == CSV_NAME]
+        elif len(csvs) > 1 and any(f["name"] == DEFAULT_CSV for f in csvs):
+            csvs = [f for f in csvs if f["name"] == DEFAULT_CSV]
         if not csvs:
             die("Drive folder mein metadata CSV nahi mili")
         if len(csvs) > 1:
@@ -202,26 +226,35 @@ class Library:
             if str(r.get(ID_COLUMN, "")).strip():
                 self.meta.setdefault(norm_id(r[ID_COLUMN]), r)
 
-        # videos: naam ki shuruaat wala number = ID
+        # videos: pehle CSV ke "File Name" se exact match, warna naam ID se shuru ho
+        vids = [f for f in files
+                if Path(f["name"]).suffix.lower() in VIDEO_EXT or f["mimeType"].startswith("video/")]
+        by_name = {f["name"].strip().lower(): f for f in vids}
         self.videos = {}
-        for f in files:
-            if Path(f["name"]).suffix.lower() not in VIDEO_EXT and not f["mimeType"].startswith("video/"):
-                continue
-            m = re.match(r"^(\d+)", f["name"])
-            if m:
-                self.videos.setdefault(norm_id(m.group(1)), f)
-            else:
-                print(f"⚠️  Video ke naam mein ID nahi: {f['name']}")
+        for vid_id, r in self.meta.items():
+            fname = str(r.get(FILE_COLUMN) or "").strip().lower()
+            f = by_name.get(fname) if fname else None
+            if not f:
+                f = next((v for v in vids if self._id_of(v["name"]) == vid_id), None)
+            if f:
+                self.videos[vid_id] = f
+        matched = {f["id"] for f in self.videos.values()}
+        self.unmatched_files = sorted(f["name"] for f in vids if f["id"] not in matched)
+
+    @staticmethod
+    def _id_of(name):
+        m = re.match(r"^([A-Za-z_]*\d+)", name)
+        return norm_id(m.group(1)) if m else None
 
     def pending(self):
-        ids = sorted(set(self.meta) & set(self.videos), key=lambda x: (len(x), x))
+        ids = sorted(set(self.meta) & set(self.videos), key=natural_key)
         return [i for i in ids if self.log.get(i, {}).get("status") not in ("UPLOADED", "SKIPPED")]
 
     def save_log(self):
         out = io.StringIO()
         w = csv.DictWriter(out, fieldnames=LOG_FIELDS, extrasaction="ignore")
         w.writeheader()
-        for k in sorted(self.log, key=lambda x: (len(x), x)):
+        for k in sorted(self.log, key=natural_key):
             w.writerow(self.log[k])
         self.log_file_id = self.drive.write_text(LOG_NAME, DRIVE_FOLDER_ID, out.getvalue(), self.log_file_id)
 
@@ -272,7 +305,7 @@ class YouTube:
     def upload(self, path, title, desc):
         body = {
             "snippet": {"title": title, "description": desc, "categoryId": CATEGORY_ID},
-            "status": {"privacyStatus": VIDEO_PRIVACY, "selfDeclaredMadeForKids": False},
+            "status": {"privacyStatus": VIDEO_PRIVACY, "selfDeclaredMadeForKids": MADE_FOR_KIDS},
         }
         media = MediaFileUpload(str(path), mimetype="video/*", chunksize=8 * 1024 * 1024, resumable=True)
         req = self.api.videos().insert(part="snippet,status", body=body, media_body=media)
@@ -310,25 +343,18 @@ def cmd_status(_args):
     lib = Library(Drive(credentials()))
     done = sum(1 for r in lib.log.values() if r.get("status") in ("UPLOADED", "SKIPPED"))
     no_video = sorted(set(lib.meta) - set(lib.videos))
-    no_meta = sorted(set(lib.videos) - set(lib.meta))
+    no_meta = lib.unmatched_files
     print(f"📄 CSV rows: {len(lib.meta)}   🎬 Videos: {len(lib.videos)}")
     print(f"✅ Uploaded/skipped: {done}   ⏳ Pending: {len(lib.pending())}")
     if no_video:
         print(f"⚠️  CSV mein hai, video nahi: {', '.join(no_video[:20])}{' ...' if len(no_video) > 20 else ''}")
     if no_meta:
-        print(f"⚠️  Video hai, CSV row nahi: {', '.join(no_meta[:20])}{' ...' if len(no_meta) > 20 else ''}")
+        print(f"⚠️  Drive mein video hai, CSV row nahi: {', '.join(no_meta[:20])}{' ...' if len(no_meta) > 20 else ''}")
 
 
 def cmd_mark_done(args):
     lib = Library(Drive(credentials()))
-    ids = []
-    for part in args.ids.split(","):
-        part = part.strip()
-        if "-" in part:
-            a, b = part.split("-")
-            ids += [norm_id(i) for i in range(int(a), int(b) + 1)]
-        elif part:
-            ids.append(norm_id(part))
+    ids = expand_ids(args.ids)
     for i in ids:
         if lib.log.get(i, {}).get("status") != "UPLOADED":
             lib.log[i] = {"id": i, "status": "SKIPPED", "uploaded_at": datetime.now(timezone.utc).isoformat()}
@@ -340,7 +366,7 @@ def cmd_upload(args):
     creds = credentials()
     lib = Library(Drive(creds))
     todo = lib.pending()[: args.count]
-    print(f"⏳ Pending: {len(lib.pending())}  →  aaj upload: {len(todo)}  (privacy: {VIDEO_PRIVACY})")
+    print(f"⏳ Pending: {len(lib.pending())}  →  aaj upload: {len(todo)}  (privacy: {VIDEO_PRIVACY}, kids: {MADE_FOR_KIDS})")
     if not todo:
         print("🎉 Kuch baaki nahi hai")
         return
@@ -395,7 +421,7 @@ def main():
     up.add_argument("--count", type=int, default=int(os.environ.get("DAILY_COUNT", "3") or 3))
     up.add_argument("--dry-run", action="store_true")
     up.set_defaults(fn=cmd_upload)
-    md = sub.add_parser("mark-done", help="IDs ko pehle se uploaded maano, e.g. 1-66 ya 3,7,9")
+    md = sub.add_parser("mark-done", help="IDs ko pehle se uploaded maano, e.g. VID0001-VID0066 ya VID0003,VID0007")
     md.add_argument("ids")
     md.set_defaults(fn=cmd_mark_done)
     args = ap.parse_args()

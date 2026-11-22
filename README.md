@@ -3,8 +3,9 @@
 Google Drive folder se videos aur metadata CSV padh ke, GitHub Actions ke zariye **roz 3 videos** YouTube pe upload karta hai.
 
 ## Drive folder ka format
-- Videos kisi bhi subfolder mein hon, file ka naam ID se shuru ho: `0001_edited.mp4`, `12_final.mp4`
-- Ek CSV jisme `Serial Number` (ID), `Title`, `Description` columns hon
+- Videos kisi bhi subfolder mein hon (jaise `VID0001_edited.mp4`)
+- `all_shorts_data.csv` jisme `Unique ID`, `File Name`, `Title`, `Description` columns hon
+  (video `File Name` se match hota hai; woh na mile toh file naam ID se shuru hona chahiye)
 - Script khud `youtube_upload_log.csv` banati hai Drive folder mein — usi se pata chalta hai kya upload ho chuka hai (dobara upload nahi hota)
 
 ## Setup (ek baar)
@@ -30,7 +31,7 @@ export DRIVE_FOLDER_ID=<drive folder link ka last part>
 ```
 Jo videos pehle hi upload ho chuke hain unhe skip karo:
 ```bash
-.venv/bin/python uploader.py mark-done 1-66
+.venv/bin/python uploader.py mark-done VID0001-VID0066
 ```
 
 ### 4. GitHub Secrets
@@ -45,6 +46,7 @@ Optional variables (Settings → Secrets and variables → Actions → Variables
 | `VIDEO_PRIVACY` | `private` | `private` / `unlisted` / `public` |
 | `PLAYLIST_TITLE` | `AI Shorts` | khaali = playlist nahi |
 | `DAILY_COUNT` | `3` | roz kitne videos |
+| `MADE_FOR_KIDS` | `false` | bachchon ke liye bana content hai toh `true` (YouTube/COPPA rule) |
 
 ### 5. Chalao
 Workflow roz **10:00 AM IST** pe apne aap chalta hai. Turant test: *Actions → Daily YouTube Upload → Run workflow*.
