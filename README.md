@@ -47,7 +47,7 @@ gh secret set DRIVE_FOLDER_ID --body "<folder id>"
 Optional variables (Settings → Secrets and variables → Actions → Variables):
 | Variable | Default | |
 |---|---|---|
-| `VIDEO_PRIVACY` | `private` | `private` / `unlisted` / `public` |
+| `VIDEO_PRIVACY` | `public` | `private` / `unlisted` / `public` |
 | `PLAYLIST_TITLE` | `AI Shorts` | khaali = playlist nahi |
 | `PER_RUN_COUNT` | `1` | har run mein kitne videos (har 6 ghante ek run) |
 | `SKIP_IDS` | | ye IDs kabhi upload nahi hongi |

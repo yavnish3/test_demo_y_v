@@ -46,7 +46,7 @@ SCOPES = [YT_SCOPE, DRIVE_SCOPE]
 
 # ─────────────── settings ───────────────
 DRIVE_FOLDER_ID = os.environ.get("DRIVE_FOLDER_ID", "").strip()
-VIDEO_PRIVACY = os.environ.get("VIDEO_PRIVACY", "private").strip() or "private"   # private / unlisted / public
+VIDEO_PRIVACY = os.environ.get("VIDEO_PRIVACY", "public").strip() or "public"   # private / unlisted / public
 PLAYLIST_TITLE = os.environ.get("PLAYLIST_TITLE", "AI Shorts").strip()               # khaali = playlist nahi
 CATEGORY_ID = os.environ.get("CATEGORY_ID", "22").strip() or "22"                     # 22 People & Blogs, 23 Comedy
 MADE_FOR_KIDS = os.environ.get("MADE_FOR_KIDS", "false").strip().lower() == "true"

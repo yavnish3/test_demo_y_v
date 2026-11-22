@@ -43,7 +43,7 @@ jobs:
           GOOGLE_TOKEN: ${{ secrets.GOOGLE_TOKEN }}
           GOOGLE_DRIVE_TOKEN: ${{ secrets.GOOGLE_DRIVE_TOKEN }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-          VIDEO_PRIVACY: ${{ vars.VIDEO_PRIVACY || 'private' }}
+          VIDEO_PRIVACY: ${{ vars.VIDEO_PRIVACY || 'public' }}
           PLAYLIST_TITLE: ${{ vars.PLAYLIST_TITLE || 'AI Shorts' }}
           MADE_FOR_KIDS: ${{ vars.MADE_FOR_KIDS || 'false' }}
           SKIP_IDS: ${{ vars.SKIP_IDS }}
