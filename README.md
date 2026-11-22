@@ -1,6 +1,6 @@
 # Drive → YouTube Shorts Auto Uploader
 
-Google Drive folder se videos aur metadata CSV padh ke, GitHub Actions ke zariye **roz 3 videos** YouTube pe upload karta hai.
+Google Drive folder se videos aur metadata CSV padh ke, GitHub Actions ke zariye **roz 3 videos** (din mein 3 baar, 1-1) YouTube pe upload karta hai.
 
 ## Drive folder ka format
 - Videos kisi bhi subfolder mein hon (jaise `VID0001_edited.mp4`)
@@ -49,12 +49,12 @@ Optional variables (Settings → Secrets and variables → Actions → Variables
 |---|---|---|
 | `VIDEO_PRIVACY` | `private` | `private` / `unlisted` / `public` |
 | `PLAYLIST_TITLE` | `AI Shorts` | khaali = playlist nahi |
-| `DAILY_COUNT` | `3` | roz kitne videos |
+| `PER_RUN_COUNT` | `1` | har run mein kitne videos (din mein 3 runs) |
 | `SKIP_IDS` | | ye IDs kabhi upload nahi hongi |
 | `MADE_FOR_KIDS` | `false` | bachchon ke liye bana content hai toh `true` (YouTube/COPPA rule) |
 
 ### 5. Chalao
-Workflow roz **10:00 AM IST** pe apne aap chalta hai. Turant test: *Actions → Daily YouTube Upload → Run workflow*.
+Workflow roz **8:47 AM, 2:47 PM, 7:47 PM IST** pe apne aap chalta hai (GitHub kabhi 5–30 min late chalata hai). Turant test: *Actions → Daily YouTube Upload → Run workflow*.
 
 ## Dhyan rakhne wali baatein
 - **Private lock:** Jab tak Google aapke API project ka audit nahi karta, API se upload hue videos YouTube **private** pe lock kar deta hai, `VIDEO_PRIVACY=public` set karne pe bhi. Inhe Studio se haath se public karo, ya [audit form](https://support.google.com/youtube/contact/yt_api_form) bharo.

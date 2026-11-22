@@ -1,13 +1,15 @@
 name: Daily YouTube Upload
 
 on:
-  schedule:
-    - cron: "30 4 * * *"        # roz 10:00 AM IST (04:30 UTC)
+  schedule:                     # din mein 3 baar, har baar 1 video (ek run chhoote toh baaki chalte hain)
+    - cron: "17 3 * * *"        # 08:47 AM IST
+    - cron: "17 9 * * *"        # 02:47 PM IST
+    - cron: "17 14 * * *"       # 07:47 PM IST
   workflow_dispatch:            # Actions tab se manually bhi chala sakte ho
     inputs:
       count:
         description: "Kitne videos upload karne hain"
-        default: "3"
+        default: "1"
 
 concurrency:
   group: youtube-upload
@@ -40,5 +42,5 @@ jobs:
           PLAYLIST_TITLE: ${{ vars.PLAYLIST_TITLE || 'AI Shorts' }}
           MADE_FOR_KIDS: ${{ vars.MADE_FOR_KIDS || 'false' }}
           SKIP_IDS: ${{ vars.SKIP_IDS }}
-          COUNT: ${{ inputs.count || vars.DAILY_COUNT || '3' }}
+          COUNT: ${{ inputs.count || vars.PER_RUN_COUNT || '1' }}
         run: python uploader.py upload --count "$COUNT"
