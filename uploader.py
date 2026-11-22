@@ -265,8 +265,17 @@ class Library:
         return done
 
     def pending(self, done):
-        ids = sorted(set(self.meta) & set(self.videos), key=natural_key)
-        return [i for i in ids if i not in done]
+        """CSV ki row order mein. Jo video Drive pe abhi nahi hai, uske aage nahi badhte
+        (order na toote) — wo aate hi wahi se continue hota hai."""
+        out = []
+        for i in self.meta:                     # dict = CSV row order
+            if i in done:
+                continue
+            if i not in self.videos:
+                print(f"⏸️  {i} ka video Drive pe abhi nahi hai — order ke liye yahin ruk rahe hain")
+                break
+            out.append(i)
+        return out
 
 
 # ─────────────── youtube ───────────────
