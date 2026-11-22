@@ -38,5 +38,6 @@ jobs:
           VIDEO_PRIVACY: ${{ vars.VIDEO_PRIVACY || 'private' }}
           PLAYLIST_TITLE: ${{ vars.PLAYLIST_TITLE || 'AI Shorts' }}
           MADE_FOR_KIDS: ${{ vars.MADE_FOR_KIDS || 'false' }}
+          SKIP_IDS: ${{ vars.SKIP_IDS }}
           COUNT: ${{ inputs.count || vars.DAILY_COUNT || '3' }}
         run: python uploader.py upload --count "$COUNT"

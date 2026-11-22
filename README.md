@@ -6,7 +6,7 @@ Google Drive folder se videos aur metadata CSV padh ke, GitHub Actions ke zariye
 - Videos kisi bhi subfolder mein hon (jaise `VID0001_edited.mp4`)
 - `all_shorts_data.csv` jisme `Unique ID`, `File Name`, `Title`, `Description` columns hon
   (video `File Name` se match hota hai; woh na mile toh file naam ID se shuru hona chahiye)
-- Script khud `youtube_upload_log.csv` banati hai Drive folder mein — usi se pata chalta hai kya upload ho chuka hai (dobara upload nahi hota)
+- Kya upload ho chuka hai, ye **YouTube channel se hi** pata chalta hai: har video pe uski ID (`VID0001`) tag lagti hai, aur same title wala video channel pe ho toh bhi skip hota hai. Koi alag log file nahi.
 
 ## Setup (ek baar)
 
@@ -29,10 +29,7 @@ export DRIVE_FOLDER_ID=<drive folder link ka last part>
 .venv/bin/python uploader.py status
 .venv/bin/python uploader.py upload --dry-run
 ```
-Jo videos pehle hi upload ho chuke hain unhe skip karo:
-```bash
-.venv/bin/python uploader.py mark-done VID0001-VID0066
-```
+Kuch IDs zabardasti skip karni hon toh GitHub Variable `SKIP_IDS` mein daalo, jaise `VID0001-VID0010,VID0042`.
 
 ### 4. GitHub Secrets
 ```bash
@@ -46,6 +43,7 @@ Optional variables (Settings → Secrets and variables → Actions → Variables
 | `VIDEO_PRIVACY` | `private` | `private` / `unlisted` / `public` |
 | `PLAYLIST_TITLE` | `AI Shorts` | khaali = playlist nahi |
 | `DAILY_COUNT` | `3` | roz kitne videos |
+| `SKIP_IDS` | | ye IDs kabhi upload nahi hongi |
 | `MADE_FOR_KIDS` | `false` | bachchon ke liye bana content hai toh `true` (YouTube/COPPA rule) |
 
 ### 5. Chalao
