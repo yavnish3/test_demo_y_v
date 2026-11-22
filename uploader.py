@@ -6,7 +6,9 @@ Drive folder mein:
   - ek CSV (default: all_shorts_data.csv) jisme Unique ID, File Name, Title, Description
 
 Commands:
-  python uploader.py auth                 # ek baar, apne computer pe: Google login -> token.json
+  python uploader.py auth                 # ek baar: Google login (YouTube + Drive same account) -> token.json
+  python uploader.py auth youtube         # alag accounts hon toh: YouTube channel wala login -> token.json
+  python uploader.py auth drive           #                        Drive folder wala login   -> token_drive.json
   python uploader.py status               # kitne upload hue / baaki hain
   python uploader.py upload --count 3     # agle 3 pending videos upload
   python uploader.py upload --dry-run     # sirf dikhao kya upload hoga
@@ -38,10 +40,9 @@ from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 ROOT = Path(__file__).resolve().parent
 
 # Note: YouTube scopes ke saath drive.file allowed nahi hai (Error 400), isliye sirf ye do
-SCOPES = [
-    "https://www.googleapis.com/auth/youtube",          # upload + playlist + channel ke videos dekhna
-    "https://www.googleapis.com/auth/drive.readonly",   # Drive se video + CSV padhna
-]
+YT_SCOPE = "https://www.googleapis.com/auth/youtube"            # upload + playlist + channel ke videos dekhna
+DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly"  # Drive se video + CSV padhna
+SCOPES = [YT_SCOPE, DRIVE_SCOPE]
 
 # ─────────────── settings ───────────────
 DRIVE_FOLDER_ID = os.environ.get("DRIVE_FOLDER_ID", "").strip()
@@ -105,30 +106,44 @@ def client_config():
     return json.loads(path.read_text())
 
 
-def credentials():
-    env = os.environ.get("GOOGLE_TOKEN")
+def _load(env_name, filename):
+    env = os.environ.get(env_name)
     if env:
-        creds = Credentials.from_authorized_user_info(json.loads(env), SCOPES)
-    elif (ROOT / "token.json").exists():
-        creds = Credentials.from_authorized_user_file(str(ROOT / "token.json"), SCOPES)
-    else:
+        return Credentials.from_authorized_user_info(json.loads(env))
+    if (ROOT / filename).exists():
+        return Credentials.from_authorized_user_file(str(ROOT / filename))
+    return None
+
+
+def credentials(kind="youtube"):
+    """kind='youtube' -> GOOGLE_TOKEN / token.json
+       kind='drive'   -> GOOGLE_DRIVE_TOKEN / token_drive.json (na ho toh YouTube wala token)"""
+    creds = _load("GOOGLE_DRIVE_TOKEN", "token_drive.json") if kind == "drive" else None
+    creds = creds or _load("GOOGLE_TOKEN", "token.json")
+    if not creds:
         die("Token nahi mila. Pehle apne computer pe chalao: python uploader.py auth")
     if not creds.valid:
         if creds.refresh_token:
             creds.refresh(Request())
         else:
-            die("Token expire ho gaya. Dobara chalao: python uploader.py auth")
+            die(f"Token expire ho gaya. Dobara chalao: python uploader.py auth {kind}")
     return creds
 
 
-def cmd_auth(_args):
-    flow = InstalledAppFlow.from_client_config(client_config(), SCOPES)
-    creds = flow.run_local_server(port=0, access_type="offline", prompt="consent")
-    out = ROOT / "token.json"
+def cmd_auth(args):
+    scopes, fname, secret = {
+        "both": (SCOPES, "token.json", "GOOGLE_TOKEN"),
+        "youtube": ([YT_SCOPE], "token.json", "GOOGLE_TOKEN"),
+        "drive": ([DRIVE_SCOPE], "token_drive.json", "GOOGLE_DRIVE_TOKEN"),
+    }[args.which]
+    print(f"🔐 Login: {args.which}  →  browser mein sahi account chuno")
+    flow = InstalledAppFlow.from_client_config(client_config(), scopes)
+    creds = flow.run_local_server(port=0, access_type="offline", prompt="consent select_account")
+    out = ROOT / fname
     out.write_text(creds.to_json())
     os.chmod(out, 0o600)
-    print("✅ Login ho gaya, token.json ban gaya (ise kabhi git mein commit mat karna).")
-    print("   GitHub secret mein daalne ke liye:  gh secret set GOOGLE_TOKEN < token.json")
+    print(f"✅ Login ho gaya, {fname} ban gaya (ise kabhi git mein commit mat karna).")
+    print(f"   GitHub secret:  gh secret set {secret} < {fname}")
 
 
 # ─────────────── drive ───────────────
@@ -183,6 +198,13 @@ class Library:
     def __init__(self, drive):
         if not DRIVE_FOLDER_ID:
             die("DRIVE_FOLDER_ID set nahi hai")
+        try:
+            drive.api.files().get(fileId=DRIVE_FOLDER_ID, fields="id", supportsAllDrives=True).execute()
+        except HttpError as e:
+            if e.resp.status == 404:
+                die("Drive folder is account ko nahi dikh raha. Folder wale account se login karo: "
+                    "python uploader.py auth drive")
+            raise
         self.drive = drive
         files = list(drive.walk(DRIVE_FOLDER_ID))
 
@@ -358,9 +380,8 @@ def is_quota_error(e):
 
 # ─────────────── commands ───────────────
 def cmd_status(_args):
-    creds = credentials()
-    lib = Library(Drive(creds))
-    done = lib.done_ids(YouTube(creds).channel_videos())
+    lib = Library(Drive(credentials("drive")))
+    done = lib.done_ids(YouTube(credentials("youtube")).channel_videos())
     no_video = sorted(set(lib.meta) - set(lib.videos))
     no_meta = lib.unmatched_files
     print(f"📄 CSV rows: {len(lib.meta)}   🎬 Videos: {len(lib.videos)}")
@@ -372,9 +393,8 @@ def cmd_status(_args):
 
 
 def cmd_upload(args):
-    creds = credentials()
-    lib = Library(Drive(creds))
-    yt = YouTube(creds)
+    lib = Library(Drive(credentials("drive")))
+    yt = YouTube(credentials("youtube"))
     pending = lib.pending(lib.done_ids(yt.channel_videos()))
     todo = pending[: args.count]
     print(f"⏳ Pending: {len(pending)}  →  aaj upload: {len(todo)}  (privacy: {VIDEO_PRIVACY}, kids: {MADE_FOR_KIDS})")
@@ -418,7 +438,9 @@ def cmd_upload(args):
 def main():
     ap = argparse.ArgumentParser(description="Drive -> YouTube Shorts uploader")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("auth", help="Google login (local, ek baar)").set_defaults(fn=cmd_auth)
+    au = sub.add_parser("auth", help="Google login (local, ek baar)")
+    au.add_argument("which", nargs="?", choices=["both", "youtube", "drive"], default="both")
+    au.set_defaults(fn=cmd_auth)
     sub.add_parser("status", help="kitne baaki hain").set_defaults(fn=cmd_status)
     up = sub.add_parser("upload", help="pending videos upload karo")
     up.add_argument("--count", type=int, default=int(os.environ.get("DAILY_COUNT", "3") or 3))

@@ -23,6 +23,12 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ```
 Browser khulega → woh Google account chuno jisme Drive folder **aur** YouTube channel dono hain. "Google hasn't verified this app" aaye toh *Advanced → Continue*.
 
+**Drive folder aur YouTube channel alag accounts mein hain?** (jaise channel Brand Account pe hai) Toh do login karo:
+```bash
+.venv/bin/python uploader.py auth youtube   # channel wala account  -> token.json
+.venv/bin/python uploader.py auth drive     # Drive folder wala account -> token_drive.json
+```
+
 ### 3. Local test
 ```bash
 export DRIVE_FOLDER_ID=<drive folder link ka last part>
@@ -35,6 +41,7 @@ Kuch IDs zabardasti skip karni hon toh GitHub Variable `SKIP_IDS` mein daalo, ja
 ```bash
 gh secret set GOOGLE_CLIENT_SECRET < client_secret.json
 gh secret set GOOGLE_TOKEN < token.json
+gh secret set GOOGLE_DRIVE_TOKEN < token_drive.json   # sirf agar alag Drive login kiya
 gh secret set DRIVE_FOLDER_ID --body "<folder id>"
 ```
 Optional variables (Settings → Secrets and variables → Actions → Variables):
