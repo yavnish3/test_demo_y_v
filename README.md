@@ -1,6 +1,6 @@
 # Drive → YouTube Shorts Auto Uploader
 
-Google Drive folder se videos aur metadata CSV padh ke, GitHub Actions ke zariye **har 6 ghante mein 1 video** (roz 4) YouTube pe upload karta hai.
+Google Drive folder se videos aur metadata CSV padh ke, GitHub Actions ke zariye **ek ke baad ek, loop mein** (default: har ~6 ghante 1 video, jab tak saare upload na ho jayein) YouTube pe upload karta hai.
 
 ## Drive folder ka format
 - Videos kisi bhi subfolder mein hon (jaise `VID0001_edited.mp4`)
@@ -53,12 +53,18 @@ Optional variables (Settings → Secrets and variables → Actions → Variables
 | `SKIP_IDS` | | ye IDs kabhi upload nahi hongi |
 | `MADE_FOR_KIDS` | `false` | bachchon ke liye bana content hai toh `true` (YouTube/COPPA rule) |
 
-### 5. Chalao
-Workflow har 6 ghante, **5:47, 11:47 AM/PM IST** pe apne aap chalta hai (GitHub kabhi 5–30 min late chalata hai). Turant test: *Actions → YouTube Upload Every 6h → Run workflow*.
+### 5. Chalao (sirf ek baar)
+*Actions → YouTube Upload Loop → Run workflow*
+- `interval_minutes`: har video ke beech ka gap (default `350` ≈ 6 ghante, max 350; test ke liye `5`)
+- `count`: har run mein kitne videos (default `1`)
+
+Har run 1 video upload karta hai, phir intezaar karke khud ko dobara start karta hai. Saare videos upload hone pe loop apne aap ruk jata hai.
+- **Loop rokna ho:** Actions mein chal raha run kholo → *Cancel workflow*
+- **Loop ruk gaya ho** (jaise token expire hone pe): problem theek karke dobara *Run workflow* dabao, wahin se continue hoga
+- Ek saath do baar *Run workflow* mat dabana, warna do loop chalenge
 
 ## Dhyan rakhne wali baatein
 - **Private lock:** Jab tak Google aapke API project ka audit nahi karta, API se upload hue videos YouTube **private** pe lock kar deta hai, `VIDEO_PRIVACY=public` set karne pe bhi. Inhe Studio se haath se public karo, ya [audit form](https://support.google.com/youtube/contact/yt_api_form) bharo.
 - **Quota:** Roz 10,000 units milte hain, aur ek upload ~1,600 ka padta hai. Isliye ek din mein max ~6 uploads ho sakte hain.
-- **60 din wala rule:** Agar public repo mein 60 din tak koi commit nahi hua, toh GitHub scheduled workflow band kar deta hai. Actions tab se dobara enable kar sakte ho.
 - Sirf apne ya permission wale videos upload karo.
 - `client_secret.json`, `token.json` aur CSV `.gitignore` mein hain. Inhe kabhi commit mat karna.

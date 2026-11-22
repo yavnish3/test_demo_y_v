@@ -401,14 +401,25 @@ def cmd_status(_args):
         print(f"⚠️  Drive mein video hai, CSV row nahi: {', '.join(no_meta[:20])}{' ...' if len(no_meta) > 20 else ''}")
 
 
+def set_output(name, value):
+    """GitHub Actions ko batao (loop ke liye)."""
+    path = os.environ.get("GITHUB_OUTPUT")
+    if path:
+        with open(path, "a") as fh:
+            fh.write(f"{name}={value}\n")
+
+
 def cmd_upload(args):
     lib = Library(Drive(credentials("drive")))
     yt = YouTube(credentials("youtube"))
-    pending = lib.pending(lib.done_ids(yt.channel_videos()))
+    done = lib.done_ids(yt.channel_videos())
+    left = sum(1 for i in lib.meta if i not in done)      # CSV ke kitne videos abhi YouTube pe nahi
+    pending = lib.pending(done)
     todo = pending[: args.count]
-    print(f"⏳ Pending: {len(pending)}  →  aaj upload: {len(todo)}  (privacy: {VIDEO_PRIVACY}, kids: {MADE_FOR_KIDS})")
+    print(f"⏳ Baaki: {left}  →  is run mein: {len(todo)}  (privacy: {VIDEO_PRIVACY}, kids: {MADE_FOR_KIDS})")
     if not todo:
-        print("🎉 Kuch baaki nahi hai")
+        set_output("remaining", left)
+        print("🎉 Saare videos upload ho gaye" if left == 0 else "⏸️  Abhi upload karne layak video nahi — agle run mein")
         return
     if args.dry_run:
         for i in todo:
@@ -439,7 +450,10 @@ def cmd_upload(args):
         except HttpError as e:
             print(f"   ⚠️  Playlist mein add nahi hua: {e}")
         print(f"   ✅ Uploaded: https://youtu.be/{video_id}")
+        left -= 1
         time.sleep(3)
+    set_output("remaining", left)
+    print(f"\n📊 Ab baaki: {left}")
     if failed:
         sys.exit(f"❌ {failed} video fail hue")
 

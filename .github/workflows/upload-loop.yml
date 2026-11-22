@@ -1,0 +1,82 @@
+name: YouTube Upload Loop
+
+# Ek baar Actions tab se "Run workflow" dabao. Har run 1 video upload karta hai,
+# phir intezaar karke khud ko dobara chalata hai — jab tak saare videos upload na ho jayein.
+on:
+  workflow_dispatch:
+    inputs:
+      interval_minutes:
+        description: "Har video ke beech kitne minute (max 350 ≈ 6 ghante)"
+        default: "350"
+      count:
+        description: "Har run mein kitne videos"
+        default: "1"
+
+concurrency:
+  group: youtube-upload
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write          # agla run khud start karne ke liye
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      remaining: ${{ steps.up.outputs.remaining }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Upload video
+        id: up
+        env:
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_TOKEN: ${{ secrets.GOOGLE_TOKEN }}
+          GOOGLE_DRIVE_TOKEN: ${{ secrets.GOOGLE_DRIVE_TOKEN }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          VIDEO_PRIVACY: ${{ vars.VIDEO_PRIVACY || 'private' }}
+          PLAYLIST_TITLE: ${{ vars.PLAYLIST_TITLE || 'AI Shorts' }}
+          MADE_FOR_KIDS: ${{ vars.MADE_FOR_KIDS || 'false' }}
+          SKIP_IDS: ${{ vars.SKIP_IDS }}
+          COUNT: ${{ inputs.count || '1' }}
+        run: |
+          [[ "$COUNT" =~ ^[0-9]+$ ]] || COUNT=1
+          python uploader.py upload --count "$COUNT"
+
+  next:
+    needs: upload
+    # ek video fail bhi ho toh loop chalta rahe; par script crash ho (remaining khaali) ya sab ho gaye (0) toh ruk jaye
+    if: always() && needs.upload.outputs.remaining != '' && needs.upload.outputs.remaining != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      INTERVAL: ${{ inputs.interval_minutes || '350' }}
+      COUNT: ${{ inputs.count || '1' }}
+      REMAINING: ${{ needs.upload.outputs.remaining }}
+    steps:
+      - name: Wait
+        run: |
+          [[ "$INTERVAL" =~ ^[0-9]+$ ]] || INTERVAL=350
+          m=$(( INTERVAL > 350 ? 350 : INTERVAL )); m=$(( m < 1 ? 1 : m ))
+          echo "📊 Baaki videos: $REMAINING"
+          echo "⏳ $m minute baad agla video..."
+          sleep $(( m * 60 ))
+
+      - name: Start next run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$INTERVAL" =~ ^[0-9]+$ ]] || INTERVAL=350
+          [[ "$COUNT" =~ ^[0-9]+$ ]] || COUNT=1
+          gh workflow run upload-loop.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" \
+            -f interval_minutes="$INTERVAL" -f count="$COUNT"
+          echo "🔁 Agla run start ho gaya"
