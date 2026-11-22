@@ -59,7 +59,8 @@ Optional variables (Settings → Secrets and variables → Actions → Variables
 - `count`: har run mein kitne videos (default `1`)
 
 Har run 1 video upload karta hai, phir intezaar karke khud ko dobara start karta hai. Saare videos upload hone pe loop apne aap ruk jata hai.
-- **Loop rokna ho:** Actions mein chal raha run kholo → *Cancel workflow*
+- **Loop rokna ho:** repo mein `STOP` naam ki file bana do (GitHub website pe *Add file → Create new file*). Agla run kuch upload nahi karega aur loop khatam. Ya Actions mein chal raha run kholo → *Cancel workflow*.
+- **Dobara chalana ho:** `STOP` file delete karo, phir *Run workflow*
 - **Loop ruk gaya ho** (jaise token expire hone pe): problem theek karke dobara *Run workflow* dabao, wahin se continue hoga
 - Ek saath do baar *Run workflow* mat dabana, warna do loop chalenge
 

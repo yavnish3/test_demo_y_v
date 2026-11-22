@@ -49,6 +49,11 @@ jobs:
           SKIP_IDS: ${{ vars.SKIP_IDS }}
           COUNT: ${{ inputs.count || '1' }}
         run: |
+          if [ -f STOP ]; then
+            echo "🛑 Repo mein STOP file hai — loop band. Dobara chalane ke liye STOP file delete karo."
+            echo "remaining=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           [[ "$COUNT" =~ ^[0-9]+$ ]] || COUNT=1
           python uploader.py upload --count "$COUNT"
 
