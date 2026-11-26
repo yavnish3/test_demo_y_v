@@ -43,6 +43,7 @@ ROOT = Path(__file__).resolve().parent
 # Note: YouTube scopes ke saath drive.file allowed nahi hai (Error 400), isliye sirf ye do
 YT_SCOPE = "https://www.googleapis.com/auth/youtube"            # upload + playlist + channel ke videos dekhna
 DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly"  # Drive se video + CSV padhna
+DRIVE_WRITE_SCOPE = "https://www.googleapis.com/auth/drive"     # upload ke baad video Trash karna (alag drive login)
 SCOPES = [YT_SCOPE, DRIVE_SCOPE]
 
 # ─────────────── settings ───────────────
@@ -58,6 +59,8 @@ DESC_COLUMN = os.environ.get("DESC_COLUMN", "Description")
 CSV_NAME = os.environ.get("CSV_NAME", "").strip()      # khaali = all_shorts_data.csv ya akeli CSV
 DEFAULT_CSV = "all_shorts_data.csv"
 SKIP_IDS = os.environ.get("SKIP_IDS", "").strip()
+# saare channels pe upload ho chuka video Drive se Trash mein (30 din tak wapas la sakte ho)
+DELETE_AFTER_UPLOAD = os.environ.get("DELETE_AFTER_UPLOAD", "true").strip().lower() == "true"
 VIDEO_EXT = {".mp4", ".mov", ".m4v", ".webm", ".mkv"}
 
 FOLDER_MIME = "application/vnd.google-apps.folder"
@@ -146,7 +149,7 @@ def cmd_auth(args):
     scopes, fname, secret = {
         "both": (SCOPES, "token.json", "GOOGLE_TOKEN"),
         "youtube": ([YT_SCOPE], "token.json", "GOOGLE_TOKEN"),
-        "drive": ([DRIVE_SCOPE], "token_drive.json", "GOOGLE_DRIVE_TOKEN"),
+        "drive": ([DRIVE_WRITE_SCOPE], "token_drive.json", "GOOGLE_DRIVE_TOKEN"),
         "youtube2": ([YT_SCOPE], "token_2.json", "GOOGLE_TOKEN_2"),
     }[args.which]
     print(f"🔐 Login: {args.which}  →  browser mein sahi account chuno")
@@ -196,6 +199,9 @@ class Drive:
         while not done:
             _, done = dl.next_chunk()
         return buf.getvalue()
+
+    def trash(self, file_id):
+        self.api.files().update(fileId=file_id, body={"trashed": True}, supportsAllDrives=True).execute()
 
     def download(self, file_id, dest):
         req = self.api.files().get_media(fileId=file_id, supportsAllDrives=True)
@@ -422,12 +428,17 @@ def load_channels(lib):
 
 def cmd_status(_args):
     lib = Library(Drive(credentials("drive")))
-    no_video = sorted(set(lib.meta) - set(lib.videos))
     no_meta = lib.unmatched_files
-    print(f"📄 CSV rows: {len(lib.meta)}   🎬 Videos: {len(lib.videos)}")
-    for c in load_channels(lib):
+    channels = load_channels(lib)
+    done_all = set.intersection(*(c["done"] for c in channels)) if channels else set()
+    no_video = sorted(set(lib.meta) - set(lib.videos) - done_all)
+    print(f"📄 CSV rows: {len(lib.meta)}   🎬 Drive pe videos: {len(lib.videos)}")
+    for c in channels:
         nxt = c["pending"][0] if c["pending"] else "-"
         print(f"📺 Channel {c['n']} ({c['yt'].channel_name}): ✅ {len(c['done'])} uploaded  ⏳ {c['left']} baaki  → agla {nxt}")
+    ready = sorted(i for i in done_all if i in lib.videos)
+    if ready:
+        print(f"🗑️  Sab channels pe ho chuke, par Drive pe abhi bhi: {len(ready)} ({ready[0]}…{ready[-1]})")
     if no_video:
         print(f"⚠️  CSV mein hai, video nahi: {', '.join(no_video[:20])}{' ...' if len(no_video) > 20 else ''}")
     if no_meta:
@@ -440,6 +451,34 @@ def set_output(name, value):
     if path:
         with open(path, "a") as fh:
             fh.write(f"{name}={value}\n")
+
+
+def trash_done(lib, channels):
+    """Jo video SAARE channels pe upload ho chuka hai, use Drive se Trash mein bhejo.
+    SKIP_IDS wale kabhi delete nahi hote (wo sirf skip hain, upload nahi)."""
+    if not channels:
+        return
+    skip = set(expand_ids(SKIP_IDS)) if SKIP_IDS else set()
+    done_all = set.intersection(*(c["done"] for c in channels)) - skip
+    ids = [i for i in lib.meta if i in done_all and i in lib.videos]
+    for i in ids:
+        f = lib.videos[i]
+        try:
+            lib.drive.trash(f["id"])
+        except HttpError as e:
+            if e.resp.status in (401, 403):
+                print(f"   ⚠️  Drive se delete ki permission nahi ({e.resp.status}). "
+                      "Drive login dobara karo: python uploader.py auth drive  (aur GOOGLE_DRIVE_TOKEN secret update)")
+                return
+            print(f"   ⚠️  {i} delete nahi hua: {e}")
+            continue
+        del lib.videos[i]
+        print(f"   🗑️  {i} Drive se Trash mein ({f['name']})")
+
+
+def cmd_cleanup(_args):
+    lib = Library(Drive(credentials("drive")))
+    trash_done(lib, load_channels(lib))
 
 
 def upload_one(lib, yt, i):
@@ -488,6 +527,7 @@ def cmd_upload(args):
                 continue
             res = upload_one(lib, yt, i)
             if res == "ok":
+                c["done"].add(i)
                 left -= 1
                 time.sleep(3)
             elif res == "fail":
@@ -499,6 +539,8 @@ def cmd_upload(args):
         return
     set_output("remaining", total_left)
     print(f"\n📊 Ab baaki (sab channels): {total_left}")
+    if DELETE_AFTER_UPLOAD:
+        trash_done(lib, channels)
     if failed:
         sys.exit(f"❌ {failed} video fail hue")
 
@@ -510,6 +552,7 @@ def main():
     au.add_argument("which", nargs="?", choices=["both", "youtube", "drive", "youtube2"], default="both")
     au.set_defaults(fn=cmd_auth)
     sub.add_parser("status", help="kitne baaki hain").set_defaults(fn=cmd_status)
+    sub.add_parser("cleanup", help="sab channels pe ho chuke videos Drive se Trash karo").set_defaults(fn=cmd_cleanup)
     up = sub.add_parser("upload", help="pending videos upload karo")
     up.add_argument("--count", type=int, default=int(os.environ.get("DAILY_COUNT", "3") or 3))
     up.add_argument("--dry-run", action="store_true")

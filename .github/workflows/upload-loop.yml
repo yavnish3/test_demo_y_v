@@ -48,6 +48,7 @@ jobs:
           PLAYLIST_TITLE: ${{ vars.PLAYLIST_TITLE || 'AI Shorts' }}
           MADE_FOR_KIDS: ${{ vars.MADE_FOR_KIDS || 'false' }}
           SKIP_IDS: ${{ vars.SKIP_IDS }}
+          DELETE_AFTER_UPLOAD: ${{ vars.DELETE_AFTER_UPLOAD || 'true' }}
           COUNT: ${{ inputs.count || '1' }}
         run: |
           if [ -f STOP ]; then
