@@ -1,0 +1,80 @@
+{
+ "title": "शुतुरमुर्ग की आँख दिमाग से बड़ी! 🤯 #shorts",
+ "hook": "क्या आप जानते हो?",
+ "scene": "park",
+ "prop": "octopus",
+ "characters": {
+  "a": {
+   "type": "girl"
+  },
+  "b": null
+ },
+ "beats": [
+  {
+   "action": "walk_in"
+  },
+  {
+   "action": "think"
+  },
+  {
+   "action": "fact",
+   "text": "शुतुरमुर्ग की आँख दिमाग से बड़ी!",
+   "visual": {
+    "type": "compare",
+    "a": "eye",
+    "b": "brain",
+    "bigger": "a"
+   },
+   "react": "shock"
+  },
+  {
+   "action": "facepalm"
+  },
+  {
+   "action": "fact",
+   "text": "हम रोज़ ~20,000 बार साँस लेते हैं!",
+   "visual": {
+    "type": "counter",
+    "a": "lungs",
+    "n": 20000,
+    "unit": "बार रोज़"
+   },
+   "react": "excited"
+  },
+  {
+   "action": "cool"
+  },
+  {
+   "action": "fact",
+   "text": "12 मधुमक्खियाँ = 1 चम्मच शहद!",
+   "visual": {
+    "type": "many",
+    "a": "honeybee",
+    "b": "honey pot",
+    "n": 12,
+    "label": "पूरी ज़िंदगी"
+   },
+   "react": "idea"
+  },
+  {
+   "action": "facepalm"
+  },
+  {
+   "action": "fact",
+   "text": "गर्मी में एफिल टावर 15 cm बढ़ता है!",
+   "visual": {
+    "type": "grow",
+    "a": "Tokyo tower",
+    "b": "sun",
+    "label": "+15 cm"
+   },
+   "react": "shock"
+  },
+  {
+   "action": "laugh"
+  }
+ ],
+ "end_text": "आपको पता था?",
+ "end_sub": "कमेंट करो!",
+ "description": "मज़ेदार facts 🤯\n#shorts #facts #amazingfacts #hindi #stickman"
+}

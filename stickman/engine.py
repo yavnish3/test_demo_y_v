@@ -256,7 +256,22 @@ def skeleton(c, sc=1.0):
 
 # ═════════════════════════ story -> keyframes ═════════════════════════
 T = Tracks(DEF)
-TEXTS, BUBBLES, VOICE, SFX, MUSIC_CUTS, CARDS = [], [], [], [], [], []   # CARDS: (t0,t1,text,icon)
+TEXTS, BUBBLES, VOICE, SFX, MUSIC_CUTS, CARDS, DEMOS = [], [], [], [], [], [], []   # DEMOS: (t0,t1,spec)
+
+# fun-fact animation templates (Grok/AI inhi mein se chunta hai)
+VIS_TYPES = {
+    "count": "a + uske saath n cheezein ek-ek karke aati hain (b) — jaise octopus + 3 dil",
+    "grow": "a bada hota jaata hai (b = kaaran, jaise sun) — jaise garmi mein tower badhta hai",
+    "shrink": "a chhota hota hai (b = kaaran, jaise snowflake)",
+    "compare": "a aur b saath mein, bigger ('a' ya 'b') bada dikhta hai — jaise aankh > dimaag",
+    "become": "a -> b (a asal mein b hai / a se b banta hai) — jaise oont ka kubad = charbi",
+    "travel": "a se b tak kuch jaata hai, label = samay/doori — jaise sun -> earth '8 मिनट'",
+    "counter": "a ke saath number 0 se n tak ginti, unit — jaise lungs 20000 'बार रोज़'",
+    "cant": "a koshish karta hai par nahi kar paata, bada X — jaise haathi kood nahi sakta",
+    "sleep": "a so raha hai, ghadi tez ghoomti hai, label — jaise billi 16 घंटे",
+    "old": "a ke saath saal ki ginti n — jaise shehad 3000 साल",
+    "many": "n chhoti a milke ek b banati hain — jaise 12 madhumakkhi = 1 chammach shehad",
+}
 STYLE = {}
 
 
@@ -309,7 +324,7 @@ class Director:
         "run_away": "darr ke bhaag jaata hai aur wapas aata hai",
         "laugh": "zor se hansta hai + thumbs up (aakhir mein)",
         "caption": "screen pe chhota Hindi text (text field)",
-        "fact": "fun fact card screen pe (text: Hindi fact max 100 akshar, icon: English noun), character reaction deta hai",
+        "fact": "fun fact ANIMATION se dikhao (text: chhota Hindi label max 40 akshar, visual: template), character reaction",
         "scold": "doosre ko daantta hai (ungli dikha ke), doosra darta hai",
         "throw_item": "doosre pe throw_item phenkta hai (jaise chappal), sar pe lagti hai",
         "chase": "doosre ke peeche bhaagta hai",
@@ -880,7 +895,7 @@ class Director:
         self.say(a + 0.4, b, "हम्म!")
         self.cam(a + 0.3, a + 0.6, 1.5, cy=930)
         self.cam_reset(a + 1.6, a + 1.9)
-        self.kf(a + 1.6, a + 1.9, lean=0, ua_l=-12, la_l=-6)
+        self.kf(a + 1.6, a + 1.9, lean=0, ua_l=-12, la_l=-6, cool=0.0)
         self.t = a + 1.95
 
     def yawn_sleep(self, b):
@@ -1005,36 +1020,65 @@ class Director:
         self.t = a + 2.4
 
     def fact(self, b):
-        txt = " ".join(str(b.get("text") or "").split())[:110]
-        if not txt:
-            return
-        icon = PR.find(b.get("icon")) if b.get("icon") else None
+        txt = " ".join(str(b.get("text") or "").split())[:48]
+        vis = b.get("visual") if isinstance(b.get("visual"), dict) else {}
+        typ = vis.get("type") if vis.get("type") in VIS_TYPES else ("count" if vis.get("n") and vis.get("b") else
+                                                                     "become" if vis.get("b") else "counter" if vis.get("n") else "grow")
+        def info(name, default):
+            return PR.find(name) if name and PR.find(name) else (PR.find(default) if default else None)
+        a_info = info(vis.get("a") or b.get("icon"), "red question mark") or ("builtin", "samosa")
+        defaults = {"count": "red heart", "grow": "sun", "shrink": "snowflake", "travel": "globe showing asia-australia",
+                    "sleep": "alarm clock", "old": "hourglass done", "many": "spoon", "compare": "red question mark",
+                    "become": "sparkles"}
+        b_info = info(vis.get("b"), defaults.get(typ))
+        try:
+            n = int(float(str(vis.get("n", 3)).replace(",", "")))
+        except ValueError:
+            n = 3
+        spec = dict(type=typ, a=a_info, b=b_info, n=max(1, n), label=" ".join(str(vis.get("label") or "").split())[:20],
+                    unit=" ".join(str(vis.get("unit") or "").split())[:20], bigger=vis.get("bigger", "a"))
+        if self.x() > 320:                       # stickman side mein, demo beech mein
+            self.go(250)
         a = self.t
-        dur = min(6.5, 2.8 + len(txt) / 16)
+        dur = 5.2
+        T.kf(a, a + 0.01, "step", s_vis=0.0)
         self.cam_reset(a, a + 0.3)
-        CARDS.append((a, a + dur, txt, icon))
-        SFX.append((a, "ding", 0.5))
-        self.expr(a, a + 0.3, "neutral", eye=1.1, px=0.0, py=1.0, brow=0.5, smile=0.1)
-        self.kf(a, a + 0.3, tilt=-8, ua_r=20, la_r=-150)
-        r = a + dur * 0.55
+        DEMOS.append((a, a + dur, spec))
+        if txt:
+            TEXTS.append((a + 0.4, a + dur, txt, 1720, 96 if len(txt) <= 18 else (80 if len(txt) <= 26 else 66),
+                          (255, 255, 255)))
+        # sfx timeline per template
+        tl = {"count": [(0.25 + i * 0.45 / min(n, 10), "pop", 0.5) for i in range(min(n, 10))],
+              "grow": [(0.3, "rise", 0.5)], "shrink": [(0.3, "fall", 0.5)], "compare": [(0.4, "rise", 0.4), (0.7, "ding", 0.5)],
+              "become": [(0.35, "whoosh", 0.4), (0.55, "sparkle", 0.5)], "travel": [(0.25, "whoosh", 0.5), (0.75, "ding", 0.5)],
+              "counter": [(0.2 + k * 0.05, "tick", 0.3) for k in range(11)] + [(0.75, "ding", 0.5)],
+              "cant": [(0.2, "boing", 0.35), (0.4, "boing", 0.35), (0.65, "buzz", 0.5)],
+              "sleep": [(0.2, "snore", 0.45)], "old": [(0.2 + k * 0.05, "tick", 0.3) for k in range(11)] + [(0.75, "ding", 0.5)],
+              "many": [(0.2 + k * 0.05, "pop", 0.25) for k in range(11)] + [(0.78, "ding", 0.5)]}
+        SFX.append((a, "pop", 0.5))
+        for u, name, g in tl[typ]:
+            SFX.append((a + u * dur, name, g))
+        # stickman: demo ki taraf ishara, dekhna, phir climax pe reaction
+        self.expr(a, a + 0.3, "neutral", eye=1.1, px=1.0, py=-0.3, brow=0.5, smile=0.3)
+        self.kf(a, a + 0.35, look=0.7, ua_r=95, la_r=75, tilt=6)
+        r = a + dur * 0.76
         react = str(b.get("react") or random.Random(txt).choice(["shock", "excited", "idea"]))
-        self.kf(r, r + 0.25, tilt=0, ua_r=12, la_r=6)
+        self.kf(r, r + 0.25, ua_r=12, la_r=6, tilt=0)
         if react == "shock":
-            self.expr(r, r + 0.12, "shock", "back", py=-0.3)
+            self.expr(r, r + 0.12, "shock", "back", py=-0.3, px=0.6)
             self.kf(r, r + 0.15, "out", y=-70)
             self.kf(r + 0.15, r + 0.4, "in", y=0)
-            SFX.append((r, "boing", 0.4))
             self.bubble(r, r + 1.0, "!")
         elif react == "idea":
-            self.expr(r, r + 0.15, "excited", px=0, py=-1)
-            self.bubble(r, r + 1.2, "💡")
+            self.expr(r, r + 0.15, "excited", px=0.6, py=-1)
+            self.bubble(r, r + 1.1, "💡")
         else:
-            self.expr(r, r + 0.2, "excited", sparkle=1.0)
-            SFX.append((r, "sparkle", 0.4))
-            self.kf(r + 1.0, r + 1.3, sparkle=0.0)
+            self.expr(r, r + 0.2, "excited", sparkle=1.0, px=0.6)
+            self.kf(r + 0.9, r + 1.1, sparkle=0.0)
         self.say(r + 0.05, b, random.Random(txt + "v").choice(["वाह!", "क्या?!", "अरे बाप रे!", "सच में?", "ओहो!"]))
-        self.expr(a + dur - 0.3, a + dur, "happy")
-        self.t = a + dur + 0.2
+        self.expr(a + dur - 0.3, a + dur, "happy", px=0.0)
+        self.kf(a + dur - 0.3, a + dur, look=0.0)
+        self.t = a + dur + 0.15
 
     def caption(self, b):
         txt = clean_caption(b.get("text"))
@@ -1280,7 +1324,7 @@ SCENES = ["room", "kitchen", "classroom", "park", "office", "bedroom_night"]
 def setup(story):
     global T, DUR
     T = Tracks(DEF)
-    for lst in (TEXTS, BUBBLES, VOICE, SFX, MUSIC_CUTS, CARDS):
+    for lst in (TEXTS, BUBBLES, VOICE, SFX, MUSIC_CUTS, CARDS, DEMOS):
         lst.clear()
     rnd = random.Random(str(story.get("title", "")) + str(story.get("hook", "")))
     STYLE.clear()
@@ -1296,7 +1340,10 @@ def setup(story):
     STYLE["prop_info"] = PR.find(pname) or ("builtin", "samosa")
     STYLE["throw_info"] = PR.find(story.get("throw_item") or "chappal") or PR.find("chappal")
     d = Director(story)
-    STYLE["plate"] = d.edible
+    is_fact = any(isinstance(b, dict) and b.get("action") == "fact" for b in story.get("beats", []))
+    STYLE["plate"] = d.edible and not is_fact
+    if is_fact:
+        T.k["s_vis"] = [(0.0, 0.0, "io")]
     T.k["s_hot"] = [(0.0, 1.0 if d.hot else 0.0, "io")]
     DUR = min(46.0, d.build())
     TEXTS[:] = [(a, min(b, DUR - 0.05), *rest) for a, b, *rest in TEXTS]
@@ -1820,6 +1867,143 @@ def draw_card(out, d, txt, icon, sc, alpha):
         y += int(size * 1.35)
 
 
+DEMO_C = (730.0, 860.0)
+
+
+def fmt_num(v):
+    return f"{int(round(v)):,}"
+
+
+def draw_demo(P, spec, u, t):
+    """Fun-fact animation. u = 0..1 progress."""
+    cx, cy = DEMO_C
+    pop = lambda s0, d=0.15: ease(min(1.0, max(0.0, (u - s0) / d)), "back") if u >= s0 else 0.0
+    prog = lambda s0, s1: ease((u - s0) / (s1 - s0), "io")
+    icon = lambda inf, c, size, rot=0.0: draw_prop(P, inf, c, rot, 1.0, 0, t, size=max(4, size)) if inf and size > 4 else None
+    def text(xy, s_, size, fill=(30, 30, 30), stroke=(255, 255, 255)):
+        if size > 6:
+            P.d.text((xy[0] * S, xy[1] * S), s_, font=font(size * S), fill=fill, anchor="mm", stroke_width=5 * S,
+                     stroke_fill=stroke)
+    # halka glow background
+    g = pop(0.0, 0.2)
+    if g > 0:
+        P.circle((cx, cy), 270 * g, fill=(255, 255, 255))
+        P.circle((cx, cy), 270 * g, outline=STYLE["accent"], width=8)
+    typ, A, B, n = spec["type"], spec["a"], spec["b"], spec["n"]
+    if typ == "count":
+        icon(A, (cx, cy - 70), 200 * pop(0.05))
+        m = min(n, 10)
+        for i in range(m):
+            st = 0.25 + i * 0.45 / m
+            k = pop(st)
+            if k <= 0:
+                continue
+            x = cx + (i - (m - 1) / 2) * min(105, 430 / m)
+            beat = 1 + 0.12 * math.sin(t * 14 + i) if u > st + 0.15 else 1
+            icon(B or A, (x, cy + 120), 85 * k * beat)
+            text((x, cy + 190), str(i + 1), 44 * k, fill=(220, 40, 40))
+    elif typ in ("grow", "shrink"):
+        e = prog(0.3, 0.72)
+        size = 210 * (1 + 0.45 * e) if typ == "grow" else 210 * (1 - 0.45 * e)
+        base = cy + 190
+        icon(A, (cx - 40, base - size / 2), size * pop(0.05))
+        icon(B, (cx + 170, cy - 170), 110 * pop(0.18))
+        if e > 0.02:
+            x0 = cx + 140
+            y1 = base - (size if typ == "grow" else 210)
+            y2 = base - (210 if typ == "grow" else size)
+            P.line([(x0, base), (x0, min(y1, y2))], fill=(220, 40, 40), width=8)
+            tip = min(y1, y2) if typ == "grow" else max(y1, y2)
+            d = -1 if typ == "grow" else 1
+            P.poly([(x0 - 20, tip - d * 4), (x0 + 20, tip - d * 4), (x0, tip + d * 30)], fill=(220, 40, 40))
+    elif typ == "compare":
+        e = prog(0.4, 0.7)
+        big_a = str(spec.get("bigger", "a")).lower() != "b"
+        sa = 150 * (1 + (0.4 if big_a else -0.3) * e)
+        sb = 150 * (1 + (-0.3 if big_a else 0.4) * e)
+        icon(A, (cx - 150, cy), sa * pop(0.05))
+        icon(B, (cx + 150, cy), sb * pop(0.18))
+        k = pop(0.7)
+        text((cx, cy), ">" if big_a else "<", 120 * k, fill=(220, 40, 40))
+    elif typ == "become":
+        icon(A, (cx - 160, cy), 170 * pop(0.05))
+        k = pop(0.35)
+        if k > 0:
+            P.line([(cx - 55, cy), (cx + 40 * k, cy)], fill=(220, 40, 40), width=12)
+            P.poly([(cx + 40 * k, cy - 26), (cx + 40 * k, cy + 26), (cx + 40 * k + 36, cy)], fill=(220, 40, 40))
+        kb = pop(0.55)
+        icon(B, (cx + 170, cy), 170 * kb)
+        if 0.55 < u < 0.85:
+            for j in range(5):
+                a_ = t * 4 + j * 1.256
+                draw_star(P, (cx + 170 + math.cos(a_) * 120, cy + math.sin(a_) * 110), 16)
+    elif typ == "travel":
+        pa, pb = (cx - 190, cy - 130), (cx + 170, cy + 120)
+        icon(A, pa, 150 * pop(0.05))
+        icon(B, pb, 150 * pop(0.12))
+        e = prog(0.25, 0.75)
+        if 0.25 <= u:
+            for j in range(6):
+                q = max(0.0, e - j * 0.04)
+                x, y = lerp(pa[0], pb[0], q), lerp(pa[1], pb[1], q)
+                P.circle((x, y), (22 - j * 3), fill=(255, 210, 40))
+        if spec["label"]:
+            text((cx, cy + 220), spec["label"], 70 * pop(0.75), fill=(220, 40, 40))
+    elif typ in ("counter", "old"):
+        pulse = 1 + 0.06 * math.sin(t * 10)
+        if typ == "counter":
+            icon(A, (cx, cy - 90), 190 * pop(0.05) * pulse)
+        else:
+            icon(A, (cx - 90, cy - 90), 170 * pop(0.05))
+            icon(B, (cx + 120, cy - 110), 110 * pop(0.12), rot=180 * ((t * 1.2) % 1))
+        v = n * prog(0.2, 0.75)
+        if u >= 0.2:
+            text((cx, cy + 110), fmt_num(v), 110, fill=(220, 40, 40))
+            unit = spec["unit"] or ("साल" if typ == "old" else "")
+            if unit:
+                text((cx, cy + 205), unit, 56)
+    elif typ == "cant":
+        hop = 0.0
+        for s0 in (0.2, 0.4):
+            if s0 <= u < s0 + 0.12:
+                q = (u - s0) / 0.12
+                hop = math.sin(q * math.pi) * 22
+        size = 230 * pop(0.05)
+        icon(A, (cx, cy + 60 - hop), size)
+        if hop:
+            text((cx + 150, cy - 120), "?", 70, fill=(220, 40, 40))
+        k = pop(0.62)
+        if k > 0:
+            r = 150 * k
+            P.line([(cx - r, cy - r + 60), (cx + r, cy + r + 60)], fill=(230, 40, 40), width=26)
+            P.line([(cx + r, cy - r + 60), (cx - r, cy + r + 60)], fill=(230, 40, 40), width=26)
+    elif typ == "sleep":
+        icon(A, (cx - 40, cy + 40), 220 * pop(0.05))
+        for j in range(3):
+            ph = (t * 0.7 + j / 3) % 1
+            P.d.text(((cx + 60 + ph * 90) * S, (cy - 80 - ph * 150) * S), "Z", font=font((34 + 34 * ph) * S),
+                     fill=(90, 90, 200), anchor="mm", stroke_width=3 * S, stroke_fill=(255, 255, 255))
+        icon(B, (cx + 175, cy - 170), 105 * pop(0.15), rot=(t * 400) % 360 if u > 0.2 else 0)
+        if spec["label"]:
+            text((cx, cy + 220), spec["label"], 70 * pop(0.6), fill=(220, 40, 40))
+    elif typ == "many":
+        icon(B, (cx, cy + 130), 170 * pop(0.05))
+        m = min(n, 12)
+        rnd = random.Random(m)
+        e = prog(0.2, 0.75)
+        for i in range(m):
+            st = i / m * 0.7
+            q = min(1.0, max(0.0, (e - st) / 0.3))
+            if e < st:
+                continue
+            sx, sy = cx + rnd.uniform(-240, 240), cy - 240 + rnd.uniform(-30, 30)
+            x, y = lerp(sx, cx + rnd.uniform(-50, 50), q), lerp(sy, cy + 90, q)
+            icon(A, (x, y), 70 * (1 - 0.4 * q))
+        text((cx - 190, cy - 200), f"{fmt_num(n)}×", 70 * pop(0.75), fill=(220, 40, 40))
+    if typ not in ("travel", "sleep") and spec["label"]:
+        text((cx, cy + 250), spec["label"], 60 * pop(0.7), fill=(220, 40, 40))
+
+
 def draw_frame(bg, p, t):
     img = bg.copy()
     P = Painter(img)
@@ -1862,6 +2046,9 @@ def draw_frame(bg, p, t):
         draw_glass(P, gp, -70 * p["g_mouth"], p["g_level"])
     if p["t_vis"] > 0.5:
         draw_prop(P, STYLE["throw_info"], (p["t_x"], p["t_y"]), p["t_rot"], 1.0, 0, t, size=90)
+    for t0, t1, spec in DEMOS:
+        if t0 <= t < t1:
+            draw_demo(P, spec, (t - t0) / (t1 - t0), t)
     for t0, t1, ch, who in BUBBLES:
         if t0 <= t < t1:
             s = sa if who == "a" else sb
@@ -1977,6 +2164,15 @@ def sfx(name):
     elif name == "snore":
         tt = np.arange(int(1.4 * SR)) / SR
         s = lowpass(noise(1.4), 0.05) * 4 * np.sin(np.pi * tt / 1.4) * (0.6 + 0.4 * np.sin(2 * np.pi * 40 * tt))
+    elif name == "rise":
+        s = tone(np.linspace(300, 900, int(0.6 * SR)), 0.6, harm=(1, 0.3), decay=2)
+    elif name == "fall":
+        s = tone(np.linspace(900, 250, int(0.6 * SR)), 0.6, harm=(1, 0.3), decay=2)
+    elif name == "tick":
+        s = tone(2200, 0.03, decay=150)
+    elif name == "buzz":
+        tt = np.arange(int(0.45 * SR)) / SR
+        s = np.sign(np.sin(2 * np.pi * 140 * tt)) * 0.35 * np.exp(-2 * tt)
     elif name == "chatter":
         s = np.zeros(int(1.0 * SR))
         for j in range(14):

@@ -163,12 +163,18 @@ Rules:
 def fact_prompt():
     types = ", ".join(engine.CHAR_TYPES)
     scenes = ", ".join(engine.SCENES)
-    return f"""Tum ek viral Hindi YouTube Shorts creator ho. Format: "क्या आप जानते हो?" FUN FACT video, stickman cartoon.
-Stickman screen pe fact cards dikhata hai aur har fact pe funny reaction deta hai. Koi dialogue NAHI, sirf chhoti
-expression-awaazein ("वाह!", "क्या?!", "अरे बाप रे!").
+    vis = "\n".join(f'   - "{k}": {v}' for k, v in engine.VIS_TYPES.items())
+    return f"""Tum ek viral Hindi YouTube Shorts creator ho. Format: FUN FACT video, stickman cartoon.
+Fact LIKH KE NAHI, ANIMATION se PRACTICALLY dikhaya jaata hai (icons + movement). Screen pe sirf chhota label
+(max 40 akshar). Koi dialogue NAHI, sirf expression-awaazein ("वाह!", "क्या?!", "अरे बाप रे!").
 
-SABSE ZAROORI: facts 100% SACH aur jaane-maane hon (science/encyclopedia mein verified). Shaq ho toh mat likho.
-Koi medical/health salah nahi, koi vivaadit baat nahi. Facts aise hon ki log hairan ho ke comment/share karein.
+SABSE ZAROORI: facts 100% SACH aur jaane-maane hon (verified). Shaq ho toh mat likho. Koi health salah nahi.
+
+Har fact ke liye ek "visual" template chuno jo fact ko SABSE ACHHE se dikhaye:
+{vis}
+Visual fields: "type", "a" (main cheez, English noun, emoji jaisa: octopus, sun, earth, elephant, cat, honey pot...),
+"b" (doosri cheez, English noun), "n" (number), "label" (chhota Hindi, jaise "8 मिनट"), "unit" (jaise "बार रोज़"),
+"bigger" ("a" ya "b", sirf compare ke liye).
 
 Sirf ye JSON do:
 {{
@@ -176,19 +182,22 @@ Sirf ye JSON do:
  "description": "2 line Hindi + hashtags (#shorts #facts #amazingfacts #hindi #stickman)",
  "hook": "upar ka text, max 18 akshar, jaise 'क्या आप जानते हो?'",
  "scene": "ek: {scenes}",
- "prop": "pehle fact se judi cheez, English noun",
+ "prop": "pehle fact ki main cheez, English noun",
  "prop_edible": false,
  "characters": {{"a": {{"type": "ek: {types}", "outfit_color": "red/blue/green/yellow/orange/pink/purple/sky", "glasses": true/false}}, "b": null}},
  "beats": [
    {{"action": "walk_in"}},
    {{"action": "think"}},
-   {{"action": "fact", "text": "fact Hindi mein, saral, max 100 akshar", "icon": "fact se judi cheez English noun (jaise octopus, moon, honey, camel)", "react": "shock/excited/idea"}},
-   ... 3 facts total, beech mein ek-do reaction actions (shock, facepalm, dance, cool, love, scared) ...
+   {{"action": "fact", "text": "chhota label, jaise 'ऑक्टोपस के 3 दिल!'", "visual": {{"type": "count", "a": "octopus", "b": "red heart", "n": 3}}, "react": "shock/excited/idea"}},
+   ... kul 3 facts, beech mein 1-2 reaction actions (shock, facepalm, dance, cool, scared) ...
    {{"action": "laugh"}}
  ],
  "end_text": "max 22 akshar, jaise 'आपको पता था?'",
  "end_sub": "max 14 akshar, jaise 'कमेंट करो!'"
 }}
+Examples: haathi kood nahi sakta -> {{"type":"cant","a":"elephant"}}; suraj ki roshni 8 minute ->
+{{"type":"travel","a":"sun","b":"globe showing asia-australia","label":"8 मिनट"}}; oont ka kubad charbi ->
+{{"type":"become","a":"camel","b":"butter"}}; shuturmurg ki aankh dimaag se badi -> {{"type":"compare","a":"eye","b":"brain","bigger":"a"}}
 """
 
 
@@ -242,25 +251,24 @@ def ensure_prop(name, key, model):
     return False
 
 
-FACTS = [   # backup ke liye — sab jaane-maane, verified facts
-    ("ऑक्टोपस के 3 दिल होते हैं और उसका खून नीला होता है!", "octopus"),
-    ("केला botanically एक बेरी है, लेकिन स्ट्रॉबेरी बेरी नहीं है!", "banana"),
-    ("ऊँट के कूबड़ में पानी नहीं, चर्बी जमा होती है!", "camel"),
-    ("शार्क डायनासोर से भी पहले से धरती पर हैं!", "shark"),
-    ("गर्मियों में एफिल टावर लगभग 15 सेंटीमीटर ऊँचा हो जाता है!", "thermometer"),
-    ("बिल्लियाँ दिन में 12 से 16 घंटे सोती हैं!", "cat"),
-    ("हाथी कूद नहीं सकता!", "elephant"),
-    ("चाँद पर हवा नहीं है, इसलिए वहाँ पैरों के निशान लाखों साल रह सकते हैं!", "moon"),
-    ("1995 में आलू अंतरिक्ष में उगाई जाने वाली पहली सब्ज़ी बना!", "potato"),
-    ("डॉल्फ़िन सोते समय अपना आधा दिमाग जगाए रखती हैं!", "dolphin"),
-    ("गोल्डफ़िश की याददाश्त 3 सेकंड नहीं, कई महीनों की होती है!", "tropical fish"),
-    ("शतरंज की शुरुआत भारत में 'चतुरंग' नाम के खेल से हुई थी!", "chess pawn"),
-    ("शहद कभी खराब नहीं होता — मिस्र की कब्रों में हज़ारों साल पुराना शहद मिला!", "honey pot"),
-    ("पेंगुइन अपने साथी को पत्थर का कंकड़ तोहफ़े में देते हैं!", "penguin"),
-    ("एक इंसान दिन में लगभग 20,000 बार साँस लेता है!", "lungs"),
-    ("शुतुरमुर्ग की आँख उसके दिमाग से बड़ी होती है!", "eye"),
-    ("सूरज की रोशनी को धरती तक पहुँचने में लगभग 8 मिनट लगते हैं!", "sun"),
-    ("मधुमक्खियाँ नाच कर एक-दूसरे को फूलों का रास्ता बताती हैं!", "honeybee"),
+FACTS = [   # backup — sab jaane-maane, verified facts, animation ke saath
+    ("ऑक्टोपस के 3 दिल!", dict(type="count", a="octopus", b="red heart", n=3)),
+    ("हाथी कूद नहीं सकता!", dict(type="cant", a="elephant")),
+    ("सूरज की रोशनी 8 मिनट में!", dict(type="travel", a="sun", b="globe showing asia-australia", label="8 मिनट")),
+    ("ऊँट के कूबड़ में पानी नहीं, चर्बी!", dict(type="become", a="camel", b="butter")),
+    ("शुतुरमुर्ग की आँख दिमाग से बड़ी!", dict(type="compare", a="eye", b="brain", bigger="a")),
+    ("बिल्ली रोज़ 16 घंटे तक सोती है!", dict(type="sleep", a="cat", label="16 घंटे")),
+    ("हम रोज़ ~20,000 बार साँस लेते हैं!", dict(type="counter", a="lungs", n=20000, unit="बार रोज़")),
+    ("शहद हज़ारों साल खराब नहीं होता!", dict(type="old", a="honey pot", n=3000, unit="साल")),
+    ("12 मधुमक्खियाँ = 1 चम्मच शहद!", dict(type="many", a="honeybee", b="honey pot", n=12, label="पूरी ज़िंदगी")),
+    ("गर्मी में एफिल टावर 15 cm बढ़ता है!", dict(type="grow", a="Tokyo tower", b="sun", label="+15 cm")),
+    ("शार्क डायनासोर से भी पुरानी!", dict(type="compare", a="shark", b="t-rex", bigger="a", label="सबसे पुरानी")),
+    ("चाँद पर पैरों के निशान लाखों साल रहते हैं!", dict(type="old", a="footprints", b="crescent moon", n=1000000, unit="साल")),
+    ("1995: आलू अंतरिक्ष में उगा!", dict(type="travel", a="potato", b="rocket", label="1995")),
+    ("डॉल्फ़िन आधा दिमाग जगा के सोती है!", dict(type="sleep", a="dolphin", b="brain", label="आधा दिमाग")),
+    ("पेंगुइन तोहफ़े में कंकड़ देते हैं!", dict(type="become", a="penguin", b="rock")),
+    ("केला असल में बेरी है!", dict(type="become", a="banana", b="strawberry", label="बेरी!")),
+    ("मधुमक्खी 5 आँखों वाली होती है!", dict(type="count", a="honeybee", b="eye", n=5)),
 ]
 
 
@@ -268,13 +276,13 @@ def fallback_fact_story(seed=None):
     rnd = random.Random(seed)
     facts = rnd.sample(FACTS, 3)
     beats = [{"action": "walk_in"}, {"action": "think"}]
-    for k, (txt, icon) in enumerate(facts):
-        beats.append({"action": "fact", "text": txt, "icon": icon, "react": rnd.choice(["shock", "excited", "idea"])})
+    for k, (txt, vis) in enumerate(facts):
+        beats.append({"action": "fact", "text": txt, "visual": vis, "react": rnd.choice(["shock", "excited", "idea"])})
         if k < 2:
             beats.append({"action": rnd.choice(["facepalm", "dance", "cool", "scared", "shock"])})
     beats.append({"action": "laugh"})
-    first = facts[0][0].split("!")[0][:40]
-    return {"title": f"{first}? 🤯 | Fun Facts #shorts", "hook": "क्या आप जानते हो?", "prop": facts[0][1],
+    first = facts[0][0].rstrip("!")[:40]
+    return {"title": f"{first} 🤯 | Fun Facts #shorts", "hook": "क्या आप जानते हो?", "prop": facts[0][1]["a"],
             "prop_edible": False, "scene": rnd.choice(["room", "classroom", "park", "office"]),
             "characters": {"a": {"type": rnd.choice(["teacher", "boy", "girl", "man", "woman"])}, "b": None},
             "beats": beats, "end_text": "आपको पता था?", "end_sub": "कमेंट करो!",

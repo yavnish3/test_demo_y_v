@@ -58,7 +58,10 @@ def get_story(recent_titles, used_keys, seed):
             for attempt in range(3):
                 s = story_ai.make_story(key, model, recent_titles, seed=seed + attempt, mode=mode)
                 if title_key(s.get("title", "")) not in used_keys:
-                    icons = [b.get("icon") for b in s.get("beats", []) if isinstance(b, dict)]
+                    icons = []
+                    for b in s.get("beats", []):
+                        v = b.get("visual") if isinstance(b, dict) and isinstance(b.get("visual"), dict) else {}
+                        icons += [v.get("a"), v.get("b")]
                     for name in [s.get("prop"), s.get("throw_item")] + icons:
                         story_ai.ensure_prop(name, key, model)
                     return s, "grok"
