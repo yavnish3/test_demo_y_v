@@ -256,7 +256,7 @@ def skeleton(c, sc=1.0):
 
 # ═════════════════════════ story -> keyframes ═════════════════════════
 T = Tracks(DEF)
-TEXTS, BUBBLES, VOICE, SFX, MUSIC_CUTS = [], [], [], [], []
+TEXTS, BUBBLES, VOICE, SFX, MUSIC_CUTS, CARDS = [], [], [], [], [], []   # CARDS: (t0,t1,text,icon)
 STYLE = {}
 
 
@@ -309,6 +309,7 @@ class Director:
         "run_away": "darr ke bhaag jaata hai aur wapas aata hai",
         "laugh": "zor se hansta hai + thumbs up (aakhir mein)",
         "caption": "screen pe chhota Hindi text (text field)",
+        "fact": "fun fact card screen pe (text: Hindi fact max 100 akshar, icon: English noun), character reaction deta hai",
         "scold": "doosre ko daantta hai (ungli dikha ke), doosra darta hai",
         "throw_item": "doosre pe throw_item phenkta hai (jaise chappal), sar pe lagti hai",
         "chase": "doosre ke peeche bhaagta hai",
@@ -1003,6 +1004,38 @@ class Director:
             T.kf(a + 0.8, a + 1.2, cz=1.4, cx=self.x(), cy=1080)
         self.t = a + 2.4
 
+    def fact(self, b):
+        txt = " ".join(str(b.get("text") or "").split())[:110]
+        if not txt:
+            return
+        icon = PR.find(b.get("icon")) if b.get("icon") else None
+        a = self.t
+        dur = min(6.5, 2.8 + len(txt) / 16)
+        self.cam_reset(a, a + 0.3)
+        CARDS.append((a, a + dur, txt, icon))
+        SFX.append((a, "ding", 0.5))
+        self.expr(a, a + 0.3, "neutral", eye=1.1, px=0.0, py=1.0, brow=0.5, smile=0.1)
+        self.kf(a, a + 0.3, tilt=-8, ua_r=20, la_r=-150)
+        r = a + dur * 0.55
+        react = str(b.get("react") or random.Random(txt).choice(["shock", "excited", "idea"]))
+        self.kf(r, r + 0.25, tilt=0, ua_r=12, la_r=6)
+        if react == "shock":
+            self.expr(r, r + 0.12, "shock", "back", py=-0.3)
+            self.kf(r, r + 0.15, "out", y=-70)
+            self.kf(r + 0.15, r + 0.4, "in", y=0)
+            SFX.append((r, "boing", 0.4))
+            self.bubble(r, r + 1.0, "!")
+        elif react == "idea":
+            self.expr(r, r + 0.15, "excited", px=0, py=-1)
+            self.bubble(r, r + 1.2, "💡")
+        else:
+            self.expr(r, r + 0.2, "excited", sparkle=1.0)
+            SFX.append((r, "sparkle", 0.4))
+            self.kf(r + 1.0, r + 1.3, sparkle=0.0)
+        self.say(r + 0.05, b, random.Random(txt + "v").choice(["वाह!", "क्या?!", "अरे बाप रे!", "सच में?", "ओहो!"]))
+        self.expr(a + dur - 0.3, a + dur, "happy")
+        self.t = a + dur + 0.2
+
     def caption(self, b):
         txt = clean_caption(b.get("text"))
         if txt:
@@ -1247,7 +1280,7 @@ SCENES = ["room", "kitchen", "classroom", "park", "office", "bedroom_night"]
 def setup(story):
     global T, DUR
     T = Tracks(DEF)
-    for lst in (TEXTS, BUBBLES, VOICE, SFX, MUSIC_CUTS):
+    for lst in (TEXTS, BUBBLES, VOICE, SFX, MUSIC_CUTS, CARDS):
         lst.clear()
     rnd = random.Random(str(story.get("title", "")) + str(story.get("hook", "")))
     STYLE.clear()
@@ -1737,6 +1770,56 @@ def draw_bubble(P, pos, t, t0, ch):
              stroke_fill=(255, 255, 255))
 
 
+def wrap(d, txt, fnt, maxw):
+    lines, cur = [], ""
+    for w_ in txt.split():
+        trial = (cur + " " + w_).strip()
+        if d.textlength(trial, font=fnt) <= maxw or not cur:
+            cur = trial
+        else:
+            lines.append(cur)
+            cur = w_
+    if cur:
+        lines.append(cur)
+    return lines
+
+
+def draw_card(out, d, txt, icon, sc, alpha):
+    """Fun-fact card: neeche (zameen wale hisse mein), camera se alag."""
+    if sc < 0.05 or alpha <= 0:
+        return
+    size = 58
+    fnt = font(size)
+    lines = wrap(d, txt, fnt, 880)
+    while len(lines) > 4 and size > 40:
+        size -= 6
+        fnt = font(size)
+        lines = wrap(d, txt, fnt, 880)
+    icon_h = 150 if icon else 0
+    h = 70 + icon_h + len(lines) * int(size * 1.35) + 30
+    cx, top = W / 2, max(1240, 1880 - h)
+    bw = 960 * (0.7 + 0.3 * min(1, sc))
+    d.rounded_rectangle([cx - bw / 2, top, cx + bw / 2, top + h], 36, fill=(255, 252, 240),
+                        outline=STYLE["accent"], width=8)
+    d.rounded_rectangle([cx - 210, top - 34, cx + 210, top + 30], 30, fill=STYLE["accent"], outline=(30, 30, 30), width=4)
+    d.text((cx, top - 2), "क्या आप जानते हो?", font=font(40), fill=(25, 25, 25), anchor="mm")
+    y = top + 50
+    if icon:
+        if icon[0] == "builtin":
+            im = Image.new("RGBA", (300, 300), (0, 0, 0, 0))
+            tmp = Painter(im)
+            draw_builtin(tmp, icon[1], (75, 75), 0, 1.4)
+            im = im.crop(im.getbbox() or (0, 0, 300, 300))
+            im.thumbnail((140, 140))
+        else:
+            im = PR.image(icon[0], str(icon[1]), 140)
+        out.paste(im, (int(cx - im.width / 2), int(y)), im)
+        y += icon_h
+    for ln in lines:
+        d.text((cx, y + size * 0.6), ln, font=fnt, fill=(30, 30, 30), anchor="mm")
+        y += int(size * 1.35)
+
+
 def draw_frame(bg, p, t):
     img = bg.copy()
     P = Painter(img)
@@ -1796,6 +1879,9 @@ def draw_frame(bg, p, t):
     cy = min(max(cy, ch_ / 2), H * S - ch_ / 2)
     out = img.resize((W, H), Image.LANCZOS, box=(cx - cw / 2, cy - ch_ / 2, cx + cw / 2, cy + ch_ / 2))
     d = ImageDraw.Draw(out)
+    for t0, t1, txt, icon in CARDS:
+        if t0 <= t < t1:
+            draw_card(out, d, txt, icon, ease((t - t0) / 0.3, "back"), min(1.0, (t1 - t) / 0.2))
     for t0, t1, txt, y, size, fill in TEXTS:
         if t0 <= t < t1:
             sc = ease((t - t0) / 0.25, "back")

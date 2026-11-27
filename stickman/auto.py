@@ -37,16 +37,29 @@ def title_key(t):
     return " ".join(str(t).lower().split())
 
 
+def pick_mode(seed):
+    """STORY_MIX = fact wali video ka hissa (0..1), default 0.5"""
+    try:
+        mix = float(os.environ.get("STORY_MIX", "0.5"))
+    except ValueError:
+        mix = 0.5
+    import random
+    return "fact" if random.Random(seed).random() < mix else "comedy"
+
+
 def get_story(recent_titles, used_keys, seed):
+    mode = pick_mode(seed)
+    print(f"🎭 Mode: {'fun fact' if mode == 'fact' else 'real-life comedy'}")
     key, base = story_ai.get_key()
     if key:
         try:
             model = story_ai.pick_model(key)
             print(f"🤖 AI ({'Groq' if 'groq' in base else 'xAI Grok'} / {model}) se kahani...")
             for attempt in range(3):
-                s = story_ai.make_story(key, model, recent_titles, seed=seed + attempt)
+                s = story_ai.make_story(key, model, recent_titles, seed=seed + attempt, mode=mode)
                 if title_key(s.get("title", "")) not in used_keys:
-                    for name in (s.get("prop"), s.get("throw_item")):
+                    icons = [b.get("icon") for b in s.get("beats", []) if isinstance(b, dict)]
+                    for name in [s.get("prop"), s.get("throw_item")] + icons:
                         story_ai.ensure_prop(name, key, model)
                     return s, "grok"
                 print("   title repeat hua, dobara...")
@@ -54,7 +67,7 @@ def get_story(recent_titles, used_keys, seed):
             print(f"⚠️  AI fail: {e} — backup kahani use kar rahe hain")
     else:
         print("⚠️  GROQ_API_KEY / XAI_API_KEY nahi hai — backup kahani")
-    return story_ai.fallback_story(seed), "fallback"
+    return story_ai.fallback_story(seed, mode), "fallback"
 
 
 def unique_title(title, used_keys, vid_id):

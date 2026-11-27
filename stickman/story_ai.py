@@ -37,15 +37,20 @@ def get_key():
             return k, XAI_API if name != "GROQ_API_KEY" else GROQ_API
     return "", GROQ_API
 
-THEMES = [
-    "exam ki raat padhai", "mummy ki chappal", "alarm clock aur subah ki neend", "gym ka pehla din",
-    "shaadi ka khana", "dost ka lunchbox", "teacher ka surprise test", "diet ka pehla din", "garmi mein AC",
-    "barish mein chhata", "dadaji aur mobile", "bhai-behen ka remote jhagda", "last piece pizza",
-    "chhutti ka din", "office mein boss", "cricket mein galat shot", "makkhi/machhar se pareshan",
-    "birthday cake", "chhupke se TV dekhna", "report card ka din", "cockroach ka dar", "gol gappe challenge",
-    "ice cream pighal gayi", "new phone", "online class mein so jaana", "selfie ka chakkar",
-    "diwali ke patakhe", "holi ke rang", "tiffin chori", "doodh ubal gaya", "garam chai",
+THEMES = [   # real life — jo har Indian ke saath hota hai
+    "WiFi bilkul slow", "phone 1% battery", "Monday subah office", "salary ka din vs month end",
+    "rishtedaar marks poochte hain", "light chali gayi garmi mein", "online order galat aaya", "OTP late aaya",
+    "traffic jam mein late", "sardi mein thande paani se nahana", "raat ko machhar", "group project mein akela kaam",
+    "exam ki raat padhai", "mummy ki chappal", "alarm aur 5 minute aur", "gym ka pehla din", "diet ka pehla din",
+    "shaadi ka khana", "dost ka lunchbox", "teacher ka surprise test", "bhai-behen ka remote jhagda",
+    "doodh ubal gaya", "garam chai jal gayi", "report card ka din", "cockroach ka dar", "online class mein so jaana",
+    "selfie ka chakkar", "auto wala extra paise", "bill split karna", "WhatsApp group mein good morning",
+    "naya phone gir gaya", "earphone ulajh gaye", "fridge mein khana chori", "neend nahi aati raat ko",
+    "boss ka call chhutti pe", "cricket mein galat shot", "barish mein chhata ud gaya", "garmi mein AC",
 ]
+
+FACT_TOPICS = ["jaanwar", "insaan ka sharir", "antariksh / chand / suraj", "khana", "bharat", "itihaas",
+               "samundar", "science", "paudhe", "pakshi", "keede-makode", "duniya ke record"]
 
 
 def _req(path, body=None, key=None, timeout=90):
@@ -122,6 +127,7 @@ def system_prompt():
     return f"""Tum ek viral Hindi YouTube Shorts comedy writer ho. Stickman cartoon, Mr.-Bean jaisi SILENT comedy:
 koi dialogue NAHI — sirf chehre ke expressions, body action aur chhoti expression-awaazein (jaise "ओहो!", "अरे!",
 "हा हा हा", "उफ्फ", "आह्ह!", "हम्म्म...", "बचाओ!", "ऐ!"). Kahani 25-40 second, relatable desi situation,
+REAL LIFE se judi (jo har Indian ke saath hota hai — ghar, school, office, rishtedaar, phone, traffic),
 shuru mein hook, beech mein twist, end mein punchline. Har baar BILKUL NAYI kahani.
 
 Sirf ye JSON do:
@@ -154,14 +160,56 @@ Rules:
 """
 
 
-def make_story(key, model, recent_titles=(), seed=None):
+def fact_prompt():
+    types = ", ".join(engine.CHAR_TYPES)
+    scenes = ", ".join(engine.SCENES)
+    return f"""Tum ek viral Hindi YouTube Shorts creator ho. Format: "क्या आप जानते हो?" FUN FACT video, stickman cartoon.
+Stickman screen pe fact cards dikhata hai aur har fact pe funny reaction deta hai. Koi dialogue NAHI, sirf chhoti
+expression-awaazein ("वाह!", "क्या?!", "अरे बाप रे!").
+
+SABSE ZAROORI: facts 100% SACH aur jaane-maane hon (science/encyclopedia mein verified). Shaq ho toh mat likho.
+Koi medical/health salah nahi, koi vivaadit baat nahi. Facts aise hon ki log hairan ho ke comment/share karein.
+
+Sirf ye JSON do:
+{{
+ "title": "Hindi title + 1-2 emoji, max 70 akshar, end mein #shorts (jaise 'ऑक्टोपस के 3 दिल? 🤯 #shorts')",
+ "description": "2 line Hindi + hashtags (#shorts #facts #amazingfacts #hindi #stickman)",
+ "hook": "upar ka text, max 18 akshar, jaise 'क्या आप जानते हो?'",
+ "scene": "ek: {scenes}",
+ "prop": "pehle fact se judi cheez, English noun",
+ "prop_edible": false,
+ "characters": {{"a": {{"type": "ek: {types}", "outfit_color": "red/blue/green/yellow/orange/pink/purple/sky", "glasses": true/false}}, "b": null}},
+ "beats": [
+   {{"action": "walk_in"}},
+   {{"action": "think"}},
+   {{"action": "fact", "text": "fact Hindi mein, saral, max 100 akshar", "icon": "fact se judi cheez English noun (jaise octopus, moon, honey, camel)", "react": "shock/excited/idea"}},
+   ... 3 facts total, beech mein ek-do reaction actions (shock, facepalm, dance, cool, love, scared) ...
+   {{"action": "laugh"}}
+ ],
+ "end_text": "max 22 akshar, jaise 'आपको पता था?'",
+ "end_sub": "max 14 akshar, jaise 'कमेंट करो!'"
+}}
+"""
+
+
+def make_story(key, model, recent_titles=(), seed=None, mode="comedy"):
     rnd = random.Random(seed)
-    theme = rnd.choice(THEMES)
-    recent = "\n".join(f"- {t}" for t in list(recent_titles)[-25:]) or "- (koi nahi)"
-    user = (f"Aaj ka idea/theme (zaroori nahi, inspiration): {theme}.\n"
-            f"Ye title pehle ban chuke hain, inse ALAG kahani do:\n{recent}\n"
-            f"Random number: {rnd.randint(1, 10 ** 6)}")
-    story = chat([{"role": "system", "content": system_prompt()}, {"role": "user", "content": user}], key, model)
+    recent = "\n".join(f"- {t}" for t in list(recent_titles)[-30:]) or "- (koi nahi)"
+    if mode == "fact":
+        topic = rnd.choice(FACT_TOPICS)
+        user = (f"Aaj ka topic: {topic}. 3 hairan karne wale SACCHE facts.\n"
+                f"Ye videos pehle ban chuki hain, inke facts REPEAT mat karna:\n{recent}\n"
+                f"Random number: {rnd.randint(1, 10 ** 6)}")
+        sysmsg = fact_prompt()
+    else:
+        theme = rnd.choice(THEMES)
+        user = (f"Aaj ki real-life situation (jo har Indian ke saath hoti hai): {theme}.\n"
+                f"Kahani aisi ho ki dekhne wala bole 'ye toh mere saath bhi hota hai!'.\n"
+                f"Ye title pehle ban chuke hain, inse ALAG kahani do:\n{recent}\n"
+                f"Random number: {rnd.randint(1, 10 ** 6)}")
+        sysmsg = system_prompt()
+    story = chat([{"role": "system", "content": sysmsg}, {"role": "user", "content": user}], key, model,
+                 temperature=0.7 if mode == "fact" else 1.0)
     if not isinstance(story, dict) or not isinstance(story.get("beats"), list) or len(story["beats"]) < 4:
         raise RuntimeError("Grok ne sahi kahani nahi di")
     if not isinstance((story.get("characters") or {}).get("b"), dict):
@@ -194,7 +242,48 @@ def ensure_prop(name, key, model):
     return False
 
 
-def fallback_story(seed=None):
+FACTS = [   # backup ke liye — sab jaane-maane, verified facts
+    ("ऑक्टोपस के 3 दिल होते हैं और उसका खून नीला होता है!", "octopus"),
+    ("केला botanically एक बेरी है, लेकिन स्ट्रॉबेरी बेरी नहीं है!", "banana"),
+    ("ऊँट के कूबड़ में पानी नहीं, चर्बी जमा होती है!", "camel"),
+    ("शार्क डायनासोर से भी पहले से धरती पर हैं!", "shark"),
+    ("गर्मियों में एफिल टावर लगभग 15 सेंटीमीटर ऊँचा हो जाता है!", "thermometer"),
+    ("बिल्लियाँ दिन में 12 से 16 घंटे सोती हैं!", "cat"),
+    ("हाथी कूद नहीं सकता!", "elephant"),
+    ("चाँद पर हवा नहीं है, इसलिए वहाँ पैरों के निशान लाखों साल रह सकते हैं!", "moon"),
+    ("1995 में आलू अंतरिक्ष में उगाई जाने वाली पहली सब्ज़ी बना!", "potato"),
+    ("डॉल्फ़िन सोते समय अपना आधा दिमाग जगाए रखती हैं!", "dolphin"),
+    ("गोल्डफ़िश की याददाश्त 3 सेकंड नहीं, कई महीनों की होती है!", "tropical fish"),
+    ("शतरंज की शुरुआत भारत में 'चतुरंग' नाम के खेल से हुई थी!", "chess pawn"),
+    ("शहद कभी खराब नहीं होता — मिस्र की कब्रों में हज़ारों साल पुराना शहद मिला!", "honey pot"),
+    ("पेंगुइन अपने साथी को पत्थर का कंकड़ तोहफ़े में देते हैं!", "penguin"),
+    ("एक इंसान दिन में लगभग 20,000 बार साँस लेता है!", "lungs"),
+    ("शुतुरमुर्ग की आँख उसके दिमाग से बड़ी होती है!", "eye"),
+    ("सूरज की रोशनी को धरती तक पहुँचने में लगभग 8 मिनट लगते हैं!", "sun"),
+    ("मधुमक्खियाँ नाच कर एक-दूसरे को फूलों का रास्ता बताती हैं!", "honeybee"),
+]
+
+
+def fallback_fact_story(seed=None):
+    rnd = random.Random(seed)
+    facts = rnd.sample(FACTS, 3)
+    beats = [{"action": "walk_in"}, {"action": "think"}]
+    for k, (txt, icon) in enumerate(facts):
+        beats.append({"action": "fact", "text": txt, "icon": icon, "react": rnd.choice(["shock", "excited", "idea"])})
+        if k < 2:
+            beats.append({"action": rnd.choice(["facepalm", "dance", "cool", "scared", "shock"])})
+    beats.append({"action": "laugh"})
+    first = facts[0][0].split("!")[0][:40]
+    return {"title": f"{first}? 🤯 | Fun Facts #shorts", "hook": "क्या आप जानते हो?", "prop": facts[0][1],
+            "prop_edible": False, "scene": rnd.choice(["room", "classroom", "park", "office"]),
+            "characters": {"a": {"type": rnd.choice(["teacher", "boy", "girl", "man", "woman"])}, "b": None},
+            "beats": beats, "end_text": "आपको पता था?", "end_sub": "कमेंट करो!",
+            "description": "ऐसे ही मज़ेदार facts के लिए follow करो 🤯\n#shorts #facts #amazingfacts #hindi #stickman"}
+
+
+def fallback_story(seed=None, mode="comedy"):
+    if mode == "fact":
+        return fallback_fact_story(seed)
     """Grok fail ho toh bhi video bane: random combo."""
     rnd = random.Random(seed)
     food = rnd.choice(["samosa", "laddoo", "pizza", "jalebi", "burger", "ice cream", "donut", "mango"])
