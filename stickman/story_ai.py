@@ -201,7 +201,20 @@ Examples: haathi kood nahi sakta -> {{"type":"cant","a":"elephant"}}; suraj ki r
 """
 
 
-def make_story(key, model, recent_titles=(), seed=None, mode="comedy"):
+TREND_RULES = """Neeche aaj ke INDIA ke trending topics hain ([Viral Shorts] = pichhle 2 din ke sabse zyada dekhe gaye reels/Shorts,
+[Google] = Google Trends, [YouTube] = YouTube trending). [Viral Shorts] ko pehle dekho — unka TOPIC/IDEA/trend
+pakdo (copy nahi), aur apne stickman style mein NAYI kahani banao. Inme se SIRF EK topic chuno jo
+halka-phulka, family-friendly aur comedy/fact ke layak ho (jaise cricket match, nayi movie, tyohar, mausam,
+sona-petrol mehnga, naya phone/game, viral challenge, exam/result, chhutti).
+KABHI MAT CHUNO: politics/neta/chunav, dharm/mandir-masjid, maut/hadsa/aapda, crime, jang, bimari, kisi asli
+insaan ka mazaak. Kahani mein kisi asli celebrity/neta ka naam ya brand ka naam mat daalo — topic ko aam aadmi
+ki relatable situation bana do (jaise 'match ke time light chali gayi', '3 ghante ki movie mein neend').
+Title aur hashtags mein trend ka keyword zaroor daalo (search mein aaye), par bina asli insaan ke naam ke.
+JSON mein extra field: "trend": "chuna hua topic". Agar koi bhi topic safe nahi lage toh "trend": "" aur normal
+real-life comedy likho."""
+
+
+def make_story(key, model, recent_titles=(), seed=None, mode="comedy", trends=()):
     rnd = random.Random(seed)
     recent = "\n".join(f"- {t}" for t in list(recent_titles)[-30:]) or "- (koi nahi)"
     if mode == "fact":
@@ -210,6 +223,13 @@ def make_story(key, model, recent_titles=(), seed=None, mode="comedy"):
                 f"Ye videos pehle ban chuki hain, inke facts REPEAT mat karna:\n{recent}\n"
                 f"Random number: {rnd.randint(1, 10 ** 6)}")
         sysmsg = fact_prompt()
+    elif mode == "trend" and trends:
+        user = (f"{TREND_RULES}\n\nAaj ke trends:\n" + "\n".join(f"- {x}" for x in list(trends)[:40]) +
+                f"\n\nFormat: real-life comedy (ya agar topic fact ke layak ho toh 'fact' actions bhi use kar sakte ho).\n"
+                f"Ye title pehle ban chuke hain, inse ALAG:\n{recent}\nRandom number: {rnd.randint(1, 10 ** 6)}")
+        sysmsg = system_prompt() + "\n- 'fact' action bhi use kar sakte ho: " + json.dumps(
+            {"action": "fact", "text": "chhota label", "visual": {"type": "/".join(engine.VIS_TYPES), "a": "noun", "b": "noun", "n": 3}},
+            ensure_ascii=False)
     else:
         theme = rnd.choice(THEMES)
         user = (f"Aaj ki real-life situation (jo har Indian ke saath hoti hai): {theme}.\n"
