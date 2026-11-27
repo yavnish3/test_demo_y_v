@@ -281,8 +281,19 @@ def clean_voice(v):
     return v if v and len(v) <= 16 and len(v.split()) <= 3 else ""
 
 
+def strip_emoji(txt):
+    """Hindi font mein emoji nahi hote (dabba dikhta hai) — screen text se hata do."""
+    out = []
+    for ch in str(txt or ""):
+        o = ord(ch)
+        if o in (0x200D, 0xFE0F, 0xFE0E) or 0x2190 <= o <= 0x2BFF or 0x1F000 <= o <= 0x1FFFF or 0x2600 <= o <= 0x27BF:
+            continue
+        out.append(ch)
+    return " ".join("".join(out).split())
+
+
 def clean_caption(c):
-    return " ".join(str(c or "").split())[:22]
+    return strip_emoji(c)[:22]
 
 
 class Director:
@@ -1020,7 +1031,7 @@ class Director:
         self.t = a + 2.4
 
     def fact(self, b):
-        txt = " ".join(str(b.get("text") or "").split())[:48]
+        txt = strip_emoji(b.get("text"))[:48]
         vis = b.get("visual") if isinstance(b.get("visual"), dict) else {}
         typ = vis.get("type") if vis.get("type") in VIS_TYPES else ("count" if vis.get("n") and vis.get("b") else
                                                                      "become" if vis.get("b") else "counter" if vis.get("n") else "grow")
@@ -1035,8 +1046,8 @@ class Director:
             n = int(float(str(vis.get("n", 3)).replace(",", "")))
         except ValueError:
             n = 3
-        spec = dict(type=typ, a=a_info, b=b_info, n=max(1, n), label=" ".join(str(vis.get("label") or "").split())[:20],
-                    unit=" ".join(str(vis.get("unit") or "").split())[:20], bigger=vis.get("bigger", "a"))
+        spec = dict(type=typ, a=a_info, b=b_info, n=max(1, n), label=strip_emoji(vis.get("label"))[:20],
+                    unit=strip_emoji(vis.get("unit"))[:20], bigger=vis.get("bigger", "a"))
         if self.x() > 320:                       # stickman side mein, demo beech mein
             self.go(250)
         a = self.t
@@ -1303,9 +1314,12 @@ class Director:
         last = beats[-1]
         self.who = "b" if (last.get("who") == "b" and self.b_in) else "a"
         getattr(self, last["action"])(last)
-        end1 = clean_caption(self.story.get("end_text")) or "तुम भी ऐसा करते हो?"
+        end1 = strip_emoji(self.story.get("end_text"))[:30] or "तुम भी ऐसा करते हो?"
         end2 = clean_caption(self.story.get("end_sub")) or "कमेंट करो!"
-        TEXTS.append((self.t - 1.6, 999, end1, 1620, 92, (255, 255, 255)))
+        e0 = self.t - 1.6                      # neeche wale caption end text se na takrayein
+        TEXTS[:] = [(a_, min(b_, e0) if (y_ > 1500 and b_ > e0) else b_, tx, y_, sz, fl)
+                    for a_, b_, tx, y_, sz, fl in TEXTS if not (y_ > 1500 and a_ >= e0)]
+        TEXTS.append((self.t - 1.6, 999, end1, 1620, 92 if len(end1) <= 20 else 74, (255, 255, 255)))
         TEXTS.append((self.t - 0.9, 999, end2, 1760, 80, STYLE["accent"]))
         SFX.extend([(self.t - 1.6, "pop", 0.5), (self.t - 0.9, "pop", 0.4)])
         return self.t + 1.0

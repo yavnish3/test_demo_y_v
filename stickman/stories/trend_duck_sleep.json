@@ -1,0 +1,12 @@
+{"title":"बतख एक आँख खोलकर क्यों सोती है? 🦆🤯 #shorts","hook":"जानवरों की नींद 😴","scene":"park","prop":"duck",
+ "trend":"Why Ducks Sleep With One Eye Open",
+ "characters":{"a":{"type":"boy","outfit_color":"green","cap":true,"cap_color":"orange"},"b":null},
+ "beats":[{"action":"walk_in"},{"action":"yawn_sleep"},{"action":"wake_up","voice":"हैं?!"},{"action":"think"},
+  {"action":"fact","text":"बतख एक आँख खोलकर सोती है!","visual":{"type":"sleep","a":"duck","b":"eye","label":"एक आँख खुली 👁"},"react":"shock"},
+  {"action":"facepalm"},
+  {"action":"fact","text":"डॉल्फ़िन का आधा दिमाग जागता है!","visual":{"type":"become","a":"dolphin","b":"brain","label":"आधा सोता, आधा जागता"},"react":"idea"},
+  {"action":"cool"},
+  {"action":"fact","text":"जिराफ़ रोज़ 2 घंटे से भी कम सोता है!","visual":{"type":"sleep","a":"giraffe","label":"2 घंटे से कम"},"react":"excited"},
+  {"action":"scared","voice":"बाप रे!"},{"action":"laugh"}],
+ "end_text":"आप कितने घंटे सोते हो?","end_sub":"कमेंट करो!",
+ "description":"बतख, डॉल्फ़िन और जिराफ़ की अजीब नींद 🤯 आपको पता था?\n#shorts #facts #amazingfacts #animals #hindi #stickman #trending"}
