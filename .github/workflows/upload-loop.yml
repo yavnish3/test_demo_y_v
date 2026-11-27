@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write         # AI se bane naye props repo mein save karne ke liye
   actions: write          # agla run khud start karne ke liye
 
 jobs:
@@ -36,6 +36,48 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      # ───── nayi stickman video (Grok kahani -> render -> Drive) ─────
+      - name: Stickman tools
+        if: vars.STICKMAN_AUTO != 'false' && hashFiles('STOP') == ''
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-noto-core libraqm0 > /dev/null
+          pip install -r stickman/requirements.txt
+          python -c "from PIL import features; assert features.check('raqm'), 'raqm missing (Hindi text)'"
+
+      - name: Cache OpenMoji
+        if: vars.STICKMAN_AUTO != 'false' && hashFiles('STOP') == ''
+        uses: actions/cache@v4
+        with:
+          path: stickman/assets
+          key: openmoji-17.0.0
+
+      - name: Make stickman video
+        if: vars.STICKMAN_AUTO != 'false' && hashFiles('STOP') == ''
+        continue-on-error: true          # ye fail ho toh bhi purane videos upload hote rahein
+        timeout-minutes: 25
+        env:
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_TOKEN: ${{ secrets.GOOGLE_TOKEN }}
+          GOOGLE_DRIVE_TOKEN: ${{ secrets.GOOGLE_DRIVE_TOKEN }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          AI_MODEL: ${{ vars.AI_MODEL }}
+        run: python stickman/auto.py
+
+      - name: Save new AI props
+        if: vars.STICKMAN_AUTO != 'false' && hashFiles('STOP') == ''
+        continue-on-error: true
+        run: |
+          if [ -n "$(git status --porcelain stickman/props_ai)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add stickman/props_ai
+            git commit -m "Add AI-generated stickman props"
+            git pull --rebase -q && git push -q
+          fi
+
       - name: Upload video
         id: up
         env:
@@ -48,6 +90,7 @@ jobs:
           PLAYLIST_TITLE: ${{ vars.PLAYLIST_TITLE || 'AI Shorts' }}
           MADE_FOR_KIDS: ${{ vars.MADE_FOR_KIDS || 'false' }}
           SKIP_IDS: ${{ vars.SKIP_IDS }}
+          STICKMAN_AUTO: ${{ vars.STICKMAN_AUTO != 'false' }}
           DELETE_AFTER_UPLOAD: ${{ vars.DELETE_AFTER_UPLOAD || 'true' }}
           COUNT: ${{ inputs.count || '1' }}
         run: |

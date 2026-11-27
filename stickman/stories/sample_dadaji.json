@@ -1,0 +1,9 @@
+{"title":"दादाजी और नया मोबाइल 📱😂 #shorts","hook":"दादाजी का मोबाइल","scene":"park","prop":"mobile phone","prop_edible":false,
+ "throw_item":"chappal",
+ "characters":{"a":{"type":"dadaji","outfit_color":"white"},"b":{"type":"girl","outfit_color":"yellow"}},
+ "beats":[{"action":"walk_in"},{"action":"notice","voice":"अरे वाह!"},{"action":"grab"},{"action":"think"},
+  {"action":"use_item","voice":"हे हे हे"},{"action":"love"},{"action":"cool"},{"action":"dance"},
+  {"action":"slip_fall","voice":"अरे राम!"},{"action":"enter","who":"b"},{"action":"point_laugh","who":"b"},
+  {"action":"angry"},{"action":"throw_item"},{"action":"laugh"}],
+ "end_text":"तुम्हारे दादाजी भी ऐसे हैं?","end_sub":"कमेंट करो!",
+ "description":"दादाजी को मिला नया मोबाइल 😂\n#shorts #stickman #comedy #funny #hindi #dadaji"}

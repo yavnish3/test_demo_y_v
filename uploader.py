@@ -72,6 +72,13 @@ def die(msg):
     sys.exit(1)
 
 
+ST_PREFIX = os.environ.get("STICKMAN_PREFIX", "ST").upper()
+
+
+def is_stickman(vid_id):
+    return bool(re.fullmatch(rf"{ST_PREFIX}\d+", vid_id))
+
+
 def norm_id(value):
     """'1', '0001', '1.0' -> '0001';  'vid0001 ' -> 'VID0001'"""
     s = str(value).strip()
@@ -239,7 +246,9 @@ class Library:
         if len(csvs) > 1:
             die(f"Ek se zyada CSV mili: {[f['name'] for f in csvs]} — CSV_NAME set karo")
         meta_file = csvs[0]
+        self.meta_file = meta_file
         raw = drive.read_bytes(meta_file["id"], "text/csv" if meta_file["mimeType"] == SHEET_MIME else None)
+        self.csv_bom = raw.startswith(b"\xef\xbb\xbf")
         rows = list(csv.DictReader(io.StringIO(raw.decode("utf-8-sig"))))
         if rows and ID_COLUMN not in rows[0]:
             die(f"CSV mein '{ID_COLUMN}' column nahi hai. Columns: {list(rows[0].keys())}")
@@ -283,11 +292,14 @@ class Library:
                 done.add(by_title[title_key(v["title"])])
         return done
 
-    def pending(self, done):
+    def pending(self, done, queue="main"):
         """CSV ki row order mein. Jo video Drive pe abhi nahi hai, uske aage nahi badhte
-        (order na toote) — wo aate hi wahi se continue hota hai."""
+        (order na toote) — wo aate hi wahi se continue hota hai.
+        queue: "main" (VID...) ya "st" (stickman ST... — alag line, beech-beech mein jaati hai)"""
         out = []
         for i in self.meta:                     # dict = CSV row order
+            if (queue == "st") != is_stickman(i):
+                continue
             if i in done:
                 continue
             if i not in self.videos:
@@ -422,7 +434,7 @@ def load_channels(lib):
             die("Dono tokens ek hi channel ke hain — doosra login doosre channel se karo: python uploader.py auth youtube2")
         done = lib.done_ids(yt.channel_videos())
         out.append({"n": n, "yt": yt, "done": done, "left": sum(1 for i in lib.meta if i not in done),
-                    "pending": lib.pending(done)})
+                    "pending": lib.pending(done), "pending_st": lib.pending(done, "st")})
     return out
 
 
@@ -435,7 +447,9 @@ def cmd_status(_args):
     print(f"📄 CSV rows: {len(lib.meta)}   🎬 Drive pe videos: {len(lib.videos)}")
     for c in channels:
         nxt = c["pending"][0] if c["pending"] else "-"
-        print(f"📺 Channel {c['n']} ({c['yt'].channel_name}): ✅ {len(c['done'])} uploaded  ⏳ {c['left']} baaki  → agla {nxt}")
+        nst = c["pending_st"][0] if c["pending_st"] else "-"
+        print(f"📺 Channel {c['n']} ({c['yt'].channel_name}): ✅ {len(c['done'])} uploaded  ⏳ {c['left']} baaki  "
+              f"→ agla {nxt}, stickman {nst}")
     ready = sorted(i for i in done_all if i in lib.videos)
     if ready:
         print(f"🗑️  Sab channels pe ho chuke, par Drive pe abhi bhi: {len(ready)} ({ready[0]}…{ready[-1]})")
@@ -517,7 +531,7 @@ def cmd_upload(args):
     total_left, failed = 0, 0
     for c in channels:
         yt, left = c["yt"], c["left"]
-        todo = c["pending"][: args.count]
+        todo = c["pending_st"][: args.st_count] + c["pending"][: args.count]
         print(f"\n📺 Channel {c['n']} ({yt.channel_name}): {len(c['done'])} uploaded, {left} baaki  →  is run mein {len(todo)}")
         if not todo:
             print("   🎉 Is channel pe sab ho gaya" if left == 0 else "   ⏸️  Abhi upload karne layak video nahi")
@@ -537,7 +551,9 @@ def cmd_upload(args):
         total_left += left
     if args.dry_run:
         return
-    set_output("remaining", total_left)
+    # stickman auto-video chalu ho toh loop kabhi na ruke (har run nayi video banti hai)
+    keep_going = os.environ.get("STICKMAN_AUTO", "").strip().lower() == "true"
+    set_output("remaining", max(total_left, 1) if keep_going else total_left)
     print(f"\n📊 Ab baaki (sab channels): {total_left}")
     if DELETE_AFTER_UPLOAD:
         trash_done(lib, channels)
@@ -555,6 +571,8 @@ def main():
     sub.add_parser("cleanup", help="sab channels pe ho chuke videos Drive se Trash karo").set_defaults(fn=cmd_cleanup)
     up = sub.add_parser("upload", help="pending videos upload karo")
     up.add_argument("--count", type=int, default=int(os.environ.get("DAILY_COUNT", "3") or 3))
+    up.add_argument("--st-count", type=int, default=int(os.environ.get("ST_COUNT", "1") or 1),
+                    help="har channel pe kitni stickman (ST...) videos")
     up.add_argument("--dry-run", action="store_true")
     up.set_defaults(fn=cmd_upload)
     args = ap.parse_args()

@@ -16,3 +16,11 @@ videos/
 .venv/
 __pycache__/
 .DS_Store
+
+# stickman
+stickman/.venv/
+stickman/out/
+stickman/cache/
+stickman/assets/
+!stickman/props_ai/*.json
+!stickman/stories/*.json

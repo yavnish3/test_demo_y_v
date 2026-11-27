@@ -1,0 +1,24 @@
+{
+  "title": "आखिरी समोसा 😂 | Stickman Comedy #shorts",
+  "hook": "आखिरी समोसा",
+  "prop": "samosa",
+  "beats": [
+    {"action": "walk_in"},
+    {"action": "notice", "voice": "ओहो!"},
+    {"action": "sneaky_look", "voice": "हम्म्म..."},
+    {"action": "tiptoe"},
+    {"action": "touch_hot", "voice": "आह्ह्ह!"},
+    {"action": "blow", "voice": "फ़ूऊऊऊ"},
+    {"action": "grab"},
+    {"action": "slip_juggle", "voice": "अरे अरे अरे!"},
+    {"action": "sad", "voice": "ओह नो..."},
+    {"action": "caption", "text": "5 सेकंड रूल!"},
+    {"action": "pick_up", "voice": "हे हे हे"},
+    {"action": "eat", "voice": "म्म्म्म!"},
+    {"action": "spicy_fire", "voice": "आआआआआ!"},
+    {"action": "laugh", "voice": "हा हा हा हा!"}
+  ],
+  "end_text": "तुम भी ऐसा करते हो?",
+  "end_sub": "कमेंट करो!",
+  "description": "आखिरी समोसा और 5 सेकंड रूल 😂\n#shorts #stickman #comedy #funny #hindi"
+}

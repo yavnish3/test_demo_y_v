@@ -1,0 +1,6 @@
+{"title":"मम्मी के लड्डू 😂 #shorts","hook":"मम्मी के लड्डू","scene":"kitchen","prop":"laddoo","prop_edible":true,"throw_item":"chappal",
+ "characters":{"a":{"type":"boy","outfit_color":"blue"},"b":{"type":"mummy","outfit_color":"pink"}},
+ "beats":[{"action":"walk_in"},{"action":"notice","voice":"वाह!"},{"action":"sneaky_look"},{"action":"tiptoe"},{"action":"grab"},
+  {"action":"enter","who":"b"},{"action":"scold","who":"b","voice":"ऐ!"},{"action":"scared"},{"action":"eat"},
+  {"action":"throw_item","who":"b"},{"action":"chase","who":"b","voice":"रुक!"},{"action":"point_laugh","who":"a"}],
+ "end_text":"तुम्हारी मम्मी भी ऐसी है?","end_sub":"कमेंट करो!"}
