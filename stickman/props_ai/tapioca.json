@@ -1,0 +1,110 @@
+{
+ "name": "tapioca",
+ "shapes": [
+  {
+   "type": "rect",
+   "x": 30,
+   "y": 80,
+   "w": 40,
+   "h": 5,
+   "fill": "#A67C52",
+   "stroke": "#000000",
+   "strokeWidth": 2
+  },
+  {
+   "type": "rect",
+   "x": 30,
+   "y": 30,
+   "w": 40,
+   "h": 50,
+   "fill": "#D2A679",
+   "stroke": "#000000",
+   "strokeWidth": 2
+  },
+  {
+   "type": "ellipse",
+   "cx": 50,
+   "cy": 55,
+   "rx": 18,
+   "ry": 12,
+   "fill": "#C0392B",
+   "stroke": "#000000",
+   "strokeWidth": 2
+  },
+  {
+   "type": "circle",
+   "cx": 45,
+   "cy": 55,
+   "r": 4,
+   "fill": "#FFFFFF",
+   "stroke": "#000000",
+   "strokeWidth": 2
+  },
+  {
+   "type": "circle",
+   "cx": 55,
+   "cy": 60,
+   "r": 4,
+   "fill": "#FFFFFF",
+   "stroke": "#000000",
+   "strokeWidth": 2
+  },
+  {
+   "type": "circle",
+   "cx": 50,
+   "cy": 50,
+   "r": 4,
+   "fill": "#FFFFFF",
+   "stroke": "#000000",
+   "strokeWidth": 2
+  },
+  {
+   "type": "circle",
+   "cx": 48,
+   "cy": 58,
+   "r": 4,
+   "fill": "#FFFFFF",
+   "stroke": "#000000",
+   "strokeWidth": 2
+  },
+  {
+   "type": "circle",
+   "cx": 52,
+   "cy": 53,
+   "r": 4,
+   "fill": "#FFFFFF",
+   "stroke": "#000000",
+   "strokeWidth": 2
+  },
+  {
+   "type": "rect",
+   "x": 55,
+   "y": 5,
+   "w": 5,
+   "h": 30,
+   "fill": "#FF6666",
+   "stroke": "#000000",
+   "strokeWidth": 2
+  },
+  {
+   "type": "ellipse",
+   "cx": 70,
+   "cy": 55,
+   "rx": 8,
+   "ry": 15,
+   "fill": "#D2A679",
+   "stroke": "#000000",
+   "strokeWidth": 2
+  },
+  {
+   "type": "ellipse",
+   "cx": 50,
+   "cy": 30,
+   "rx": 20,
+   "ry": 5,
+   "fill": "#E5C29F",
+   "stroke": "#000000",
+   "strokeWidth": 2
+  }
+ ]
+}
